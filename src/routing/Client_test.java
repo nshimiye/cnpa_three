@@ -40,7 +40,9 @@ public class Client_test {
        node_name = node.getIp_addr() + ":"+ String.valueOf(node.getPort());
        routingTB.put(node_name, node);
        
-       System.out.printf("\ntb entry: %s\n", node_name);
+       node = routingTB.get("127.0.0.1:400");
+       
+       System.out.printf("\ntb entry: %s = %s \n", node_name, node.createMsg("ROUTING UPDATE"));
        
     }
 }
