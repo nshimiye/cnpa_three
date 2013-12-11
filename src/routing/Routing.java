@@ -16,4 +16,14 @@ public class Routing {
     public static void main(String[] args) {
         // TODO code application logic here
     }
+    
+    
+    /**
+     * Each client maintains a distance 
+     * vector, that is, a list of <destination, cost> tuples, one tuple per client, where cost is the 
+     * current estimate of the total link cost on the shortest path to the other client
+     */
+    
+    
+    
 }
