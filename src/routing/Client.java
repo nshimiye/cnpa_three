@@ -3,11 +3,12 @@
  */
 package routing;
 
+import java.net.Inet4Address;
+import java.net.NetworkInterface;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
-import java.util.Map.Entry;
-import java.util.Set;
+import java.util.Map;
 
 /**
  *
@@ -15,12 +16,6 @@ import java.util.Set;
  */
 public class Client {
 
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String[] args) {
-        // TODO code application logic here
-    }
     /**
      * method maintain : in charge of updating the routing table
      *
@@ -36,31 +31,123 @@ public class Client {
     /**
      * data_process method
      */
-    private boolean debug = true;
-    
-    /**
-     * initialize 
-     * create first entries, they are supposed to be neighbors
-     * format [{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, -, end}]
-     */
-    public boolean initialize(String [] node_msg){
-        
-        return false;
+    private boolean debug = false;
+    Hashtable<String, Node_data> rTable = null;
+
+    public Client(int myPort, int send_timer, String... node_data) {
+        rTable = new Hashtable<String, Node_data>();
+        String nodes = "",
+                myIpaddr = "";
+        try {
+            Enumeration iface = NetworkInterface.getNetworkInterfaces();
+            while (iface.hasMoreElements()) {
+                NetworkInterface net = (NetworkInterface) iface.nextElement();
+                if (!net.isLoopback()) {
+                    Enumeration conn_addr = net.getInetAddresses();
+
+                    Inet4Address addr = (Inet4Address) conn_addr.nextElement();
+                    myIpaddr = addr.getHostAddress();
+                    break;
+                }
+
+            }
+        } catch (Exception ex) {
+            myIpaddr = "127.0.0.1";
+        }
+        String nd;
+        for (int i = 0; i < node_data.length - 1; i++) {
+            nd = node_data[i].trim().replace(' ', ',');
+            nodes += "INIT, " + nd + ", true, " + nd + " :: ";
+
+        }
+
+        //the last entry with no "::"
+        if (node_data.length > 0) {
+            nd = node_data[node_data.length - 1].trim().replace(' ', ',');
+            nodes += "INIT, " + nd + ", true, " + nd;
+        }
+
+        //initialize node table with neighbors
+        initialize(nodes);
     }
-    
+
+    /**
+     * initialize create first entries, they are supposed to be neighbors format
+     * [{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end} :: { -,
+     * ip_addr, port, cost, -, -, -, end}]
+     */
+    public boolean initialize(String node_msg) {
+        if (debug) {//debug
+
+            System.out.printf(">>>>>> [%s]\n", node_msg);
+        }
+        Hashtable<String, Node_data> inputDVector = msg_parser(node_msg);
+
+        boolean status = update_dv(inputDVector, rTable);
+
+        return status;
+    }
+
     /**
      * create first entries, they are supposed to be neighbors
-     * @param node_msg String
-     * format [{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, -, end}]
-     * @return 
+     *
+     * @param node_msg String format [{ type, ip_addr, port, cost, isNeighbor,
+     * nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, -, end}]
+     * @return
      */
-    public boolean msg_parser(String node_msg){
+    public Hashtable<String, Node_data> msg_parser(String node_msg) {
         boolean success = false;
-        
-        String [] entries = node_msg.split("::");
+        Hashtable<String, Node_data> inputDV = new Hashtable<String, Node_data>();
+        //for now "type" entry is not in use: assume to always be ROUTE UPDATE
+        //[{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, 0, end} :: ...]
+        String node_msg_tmp = node_msg.replace('[', ' ');
+        node_msg_tmp = node_msg_tmp.replace(']', ' ');
+        String[] entries = node_msg_tmp.split("::");
+
         //i am here???????
-        
-        return success;
+        for (int i = 0; i < entries.length; i++) {
+            //{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end}
+            String entry_tmp = entries[i];
+            if (debug) {// no debug 
+
+                System.out.printf(">->->->-> [%s]\n", entry_tmp);
+            }
+            entry_tmp = entry_tmp.replace('{', ' ');
+            entry_tmp = entry_tmp.replace('}', ' ');
+
+            String[] entry = entry_tmp.split(",");
+
+            if (entry.length != 8) { //make sure this string array has 8 entries
+                continue;
+            }
+            //create the Node_data object
+
+            //sanityCheck(entry); =====   Assume data ssent in a nice way????????
+            String ipaddr = entry[1].trim();
+            int port = Integer.valueOf(entry[2].trim());
+            double cost = Double.valueOf(entry[3].trim());
+
+            boolean isngb = Boolean.valueOf(entry[4].trim());//false if -
+            String nh_addr = entry[5].trim(); //default = -
+            int nh_port = Integer.valueOf(entry[6].trim()); //default = 0
+
+            Thread lfc = null;
+            //=========================
+
+            Node_data new_item = new Node_data(ipaddr, port, cost, isngb, lfc);
+            new_item.setNh_ipaddr(nh_addr);
+            new_item.setNh_port(nh_port);
+            new_item.setLinkOn(true); //they by being on
+
+            inputDV.put(new_item.myName(), new_item);
+            if (debug) {//debug
+                Node_data input = inputDV.get(new_item.myName());
+                System.out.printf("name=<%s> [ alive=%b] [nghbor=%b] [LFC=%b] [nh=<%s:%d>] [size=%d]\n", input.myName(), input.isLinkOn(),
+                        input.isNeighbor(), input.LFC_isAlive(), input.getNh_ipaddr(), input.getNh_port(), inputDV.size());
+            }
+
+        }
+        return inputDV;
     }
 
     /**
@@ -118,12 +205,12 @@ public class Client {
                     Node_data src = routingTB.get(src_name);
 
                     if (src != null) { //each data entry has to have its sender already saved
-                        int newcost = input.getCost_weight() + src.getCost_weight();
+                        double newcost = input.getCost_weight() + src.getCost_weight();
                         if ((!current.isLinkOn()) || (newcost < current.getCost_weight())) {//update if input's cost is less than current's one
 
                             if (debug) {//debug
 
-                                System.out.printf("-----curr<link=%b>: name=<%s> [old=%d > ] [new=%d]-----\n",
+                                System.out.printf("-----curr<link=%b>: name=<%s> [old=%f > ] [new=%f]-----\n",
                                         current.isLinkOn(), current.myName(), current.getCost_weight(), newcost);
                             }
 
@@ -161,24 +248,27 @@ public class Client {
                     String src_name = input.getNh_ipaddr() + ":" + input.getNh_port();
                     Node_data src = routingTB.get(src_name);
 
-                    int newcost = input.getCost_weight() + src.getCost_weight();
+                    if (src != null || input.isNeighbor()) {
+                        double newcost = 0;
+                        if (input.isNeighbor()) { //isnotnull
+                            newcost = input.getCost_weight();
+                        } else { //isneighbor
+                            newcost = input.getCost_weight() + src.getCost_weight();
+                        }
 
-                    if (debug) {//debug
+                        if (debug) {//debug
+                            System.out.printf("-----new <link=%b>: name=<%s> [old=%f > ] [new=%f]-----\n",
+                                    input.isLinkOn(), input.myName(), input.getCost_weight(), newcost);
+                        }
 
-                        System.out.printf("-----curr<link=%b>: name=<%s> [old=%d > ] [new=%d]-----\n",
-                                current.isLinkOn(), current.myName(), current.getCost_weight(), newcost);
+                        input.setCost_weight(newcost);
+                        //here i have to create and assign the LFC for input
 
+                        //add
+                        routingTB.put(in_name, input);
                     }
-
-                    input.setCost_weight(newcost);
-                    //here i have to create and assign the LFC for input
-
-                    //add
-                    routingTB.put(in_name, input);
-
                     //remove
                     inputDVEntry.remove(in_name);
-
                 }
             }
 
@@ -190,14 +280,49 @@ public class Client {
         return success;
     }
 
+    /**
+     * Destination = 128.59.196.2:20000, Cost = 4.1, Link = (128.59.196.2:20000)
+     *
+     * @return
+     */
     public String tableToString() {
         String completeTB = "";
+        Node_data nd = null;
 
-        completeTB += ;
-        
-        return "";
+        Iterator<Map.Entry<String, Node_data>> tb_tmp = rTable.entrySet().iterator();
+
+        while (tb_tmp.hasNext()) {
+            nd = tb_tmp.next().getValue();
+            completeTB += "Destination = " + nd.myName()
+                    + ", Cost = " + nd.getCost_weight()
+                    + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
+        }
+        return completeTB;
     }
 
     public void showTable() {
+        System.out.println("=========  routing table  =========");
+
+        System.out.printf("%s", tableToString());
+
+        System.out.println("=========  end  =========");
+    }
+
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String[] args) {
+
+        if (args.length % 3 == 0) {
+            String[] st = new String[args.length / 3];
+            for (int i = 0; i < args.length; i += 3) {
+                st[i] = args[i] + args[i + 1] + args[i + 2];
+
+            }
+            
+        } else {
+            System.err.println("possible input error");
+            System.exit(-1);
+        }
     }
 }

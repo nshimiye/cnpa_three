@@ -15,15 +15,15 @@ public class Node_data {
 
     private String ip_addr;
     private int port;
-    private int cost_weight;
+    private double cost_weight;
     private boolean linkOn, isneighbor;
     private Thread LFC; //link failure checker
     
     //let's add the src where this data is coming from
-    private String nh_ipaddr = ""; //deafualt
+    private String nh_ipaddr = "-"; //deafualt
     private int nh_port = 0; //default
 
-    public Node_data(String ip_address, int node_port, int cost, boolean neighbor, Thread LFC_used) {
+    public Node_data(String ip_address, int node_port, double cost, boolean neighbor, Thread LFC_used) {
         ip_addr = ip_address;
         port = node_port;
         cost_weight = cost;
@@ -107,14 +107,14 @@ public class Node_data {
     /**
      * @return the cost_weight
      */
-    public int getCost_weight() {
+    public double getCost_weight() {
         return cost_weight;
     }
 
     /**
      * @param cost_weight the cost_weight to set
      */
-    public void setCost_weight(int cost_weight) {
+    public void setCost_weight(double cost_weight) {
         this.cost_weight = cost_weight;
     }
 
