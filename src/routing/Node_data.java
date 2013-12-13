@@ -20,7 +20,7 @@ public class Node_data {
     private Thread LFC; //link failure checker
     
     //let's add the src where this data is coming from
-    private String nh_ipaddr = "-"; //deafualt
+    private String nh_ipaddr = "-"; //default
     private int nh_port = 0; //default
 
     public Node_data(String ip_address, int node_port, double cost, boolean neighbor, Thread LFC_used) {
@@ -55,9 +55,8 @@ public class Node_data {
     /**
      * format used is similar to json, except
      *
-     * @param type (ROUTE UPDATE)
-     * @return the message in the format { type, ip_addr, port, cost,
-     * isNeighbor, nh_addr, nh_port, end} : '-' specifies null
+     * @param type String (ROUTE UPDATE, INIT, SELF) specifies the type of message created (not important for now)
+     * @return the message in the format { type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end}, '-' specifies null
      */
     public String createMsg(String type) {
 

@@ -39,15 +39,15 @@ public class Client_test {
         routingTB.put(node_name, node);
 
         node = routingTB.get("127.0.0.1:400");
-
+Client nd1;
         System.out.printf("\ntb entry: %s = %s \n", node_name, node.createMsg("ROUTING UPDATE"));
 
-        System.out.printf("\n\n\t\t\t\t------------test client-----------\n\n");
-        // testing the client's methods
-        // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
-        Client nd1 = new Client(20000, 5, "128.59.196.2 20000 4.1", "128.59.196.2 20001 5.2", "128.59.196.4 20000 3");
-
-        nd1.showTable();
+//        System.out.printf("\n\n\t\t\t\t------------test client-----------\n\n");
+//        // testing the client's methods
+//        // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
+//         nd1 = new Client(20000, 5, "128.59.196.2 20000 4.1", "128.59.196.2 20001 5.2", "128.59.196.4 20000 3");
+//
+//        nd1.showTable();
 
 
         System.out.printf("\n\n\t\t\t\t------------test client stage 2-----------\n\n");
@@ -57,8 +57,8 @@ public class Client_test {
         if (args.length % 3 == 0) {
             st = new String[args.length / 3];
             for (int i = 0; i < st.length; i++) {
-                st[i] = " " + args[i * 3] +" "+ args[(i * 3) + 1] +" "+ args[(i * 3) + 2]+ " ";
-                System.out.printf("%s\n",st[i]);
+                st[i] = " " + args[i * 3] + " " + args[(i * 3) + 1] + " " + args[(i * 3) + 2] + " ";
+                System.out.printf("%s\n", st[i]);
             }
 
         } else {
@@ -69,6 +69,7 @@ public class Client_test {
         // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
         nd1 = new Client(20000, 5, st);
 
+        System.out.printf("\n%s\n", nd1.rTableForSND());
         nd1.showTable();
     }
 }

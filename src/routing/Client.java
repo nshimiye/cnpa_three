@@ -4,6 +4,7 @@
 package routing;
 
 import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -32,7 +33,8 @@ public class Client {
      * data_process method
      */
     private boolean debug = false;
-    Hashtable<String, Node_data> rTable = null;
+    private Hashtable<String, Node_data> rTable = null;
+    private Node_data my_data = null;
 
     public Client(int myPort, int send_timer, String... node_data) {
         rTable = new Hashtable<String, Node_data>();
@@ -42,16 +44,37 @@ public class Client {
             Enumeration iface = NetworkInterface.getNetworkInterfaces();
             while (iface.hasMoreElements()) {
                 NetworkInterface net = (NetworkInterface) iface.nextElement();
+                if (debug) {
+                    System.err.printf("%s", net.toString());
+                }
                 if (!net.isLoopback()) {
                     Enumeration conn_addr = net.getInetAddresses();
+//System.err.printf("oops in!!-%s\n",net.toString());
+                    if (conn_addr.hasMoreElements()) {
+                        try {
+                            Inet4Address addr = (Inet4Address) conn_addr.nextElement();
+                            if (debug) {
+                                System.err.printf("++++++-%s\n", addr.toString());
+                            }
+                            myIpaddr = addr.getHostAddress();
 
-                    Inet4Address addr = (Inet4Address) conn_addr.nextElement();
-                    myIpaddr = addr.getHostAddress();
-                    break;
+                            if (debug) {
+                                System.err.printf("===%s\n", addr.getHostName());
+                            }
+
+                            break;
+                        } catch (ClassCastException ex) {
+                            //catch ipv6, which can not be cast to ipv4
+                        }
+                    }
+                }
+                if (debug) {
+                    System.err.printf("\n");
                 }
 
             }
         } catch (Exception ex) {
+            System.err.printf("%s\n", ex.toString());
             myIpaddr = "127.0.0.1";
         }
         String nd;
@@ -67,14 +90,22 @@ public class Client {
             nodes += "INIT, " + nd + ", true, " + nd;
         }
 
+        //create my data 
+        my_data = new Node_data(myIpaddr, myPort, 0, false, null);
+        my_data.setNh_ipaddr(myIpaddr);
+        my_data.setNh_port(myPort);
+
         //initialize node table with neighbors
         initialize(nodes);
     }
 
     /**
      * initialize create first entries, they are supposed to be neighbors format
-     * [{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end} :: { -,
-     * ip_addr, port, cost, -, -, -, end}]
+     *
+     * @param node_msg string of the form [{ type, ip_addr, port, cost,
+     * isNeighbor, nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, -,
+     * end}]
+     * @return
      */
     public boolean initialize(String node_msg) {
         if (debug) {//debug
@@ -83,9 +114,14 @@ public class Client {
         }
         Hashtable<String, Node_data> inputDVector = msg_parser(node_msg);
 
-        boolean status = update_dv(inputDVector, rTable);
+        boolean status = update_dv(inputDVector, getrTable());
 
         return status;
+    }
+
+    public Node_data get_myData() {
+
+        return my_data;
     }
 
     /**
@@ -158,6 +194,8 @@ public class Client {
      * cost is the current estimate of the total link cost on the shortest path
      * to the other client ========================== bellman-ford equation:
      * d_x(y) = min_v{ c(x,v) + d_v(y) } := routingTB.set(y)
+     *
+     * work on link on/off ????????????????????
      */
     public boolean update_dv(Hashtable<String, Node_data> inputDVEntry, Hashtable<String, Node_data> routingTB) {
         boolean success = false;
@@ -273,9 +311,24 @@ public class Client {
             }
 
         }
-        //2. for each node(except me), compute cost using bellman-ford equation
+        //--???2. for each node(except me), compute cost using bellman-ford equation
 
+        //if there has been a change in the table, we call the sender
+        boolean allow_send = true;
+        if (allow_send) {//rtb_updated
+            in_keys = routingTB.keys();
+            String ngb_addrs = "";
+            Node_data inTable = null;
+            while (in_keys.hasMoreElements()) {
+                in_name = in_keys.nextElement();
+                inTable = routingTB.get(in_name);
+                if (inTable.isNeighbor() && inTable.isLinkOn()) {
+                    ngb_addrs += ((ngb_addrs.trim().equals("")) ? "" : ",") + inTable.myName();
+                }
+            }
 
+            new SND_thread(this, ngb_addrs).start();
+        }
         //---
         return success;
     }
@@ -289,7 +342,7 @@ public class Client {
         String completeTB = "";
         Node_data nd = null;
 
-        Iterator<Map.Entry<String, Node_data>> tb_tmp = rTable.entrySet().iterator();
+        Iterator<Map.Entry<String, Node_data>> tb_tmp = getrTable().entrySet().iterator();
 
         while (tb_tmp.hasNext()) {
             nd = tb_tmp.next().getValue();
@@ -298,6 +351,57 @@ public class Client {
                     + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
         }
         return completeTB;
+    }
+
+    /**
+     * creating a string object representing the message to be sent the format
+     * is [{msg1}::{msg2}::{msg3}...] Note: first message "msg1" must contain
+     * information about the sender_node
+     *
+     * @return String
+     *
+     */
+    public String rTableForSND() {
+        String srtable = "[", in_name;
+
+        Node_data inTable = null, inTable_tmp;
+
+        /*
+         * add self info to the message
+         * Note: for now we assume that, sender send its cost
+         *          (same for all neighbors for now and is 1) to the neighbors
+         *         and it gets used when the sender is joining the net
+         */
+        inTable = get_myData();
+        inTable_tmp = new Node_data(inTable.getIp_addr(), inTable.getPort(),
+                inTable.getCost_weight() + 1, true, null);
+        //i am the sender, so i have to update nh_info
+        inTable_tmp.setNh_ipaddr(get_myData().getIp_addr());
+        inTable_tmp.setNh_port(get_myData().getNh_port());
+        srtable += inTable_tmp.createMsg("ROUTING UPDATE");
+
+        Hashtable<String, Node_data> inputDVEntry = getrTable();
+        Enumeration<String> in_keys = inputDVEntry.keys();
+        while (in_keys.hasMoreElements()) {
+            in_name = in_keys.nextElement();
+
+            //if the entry is not found, then add it
+            inTable = inputDVEntry.get(in_name);
+            if (inTable.isLinkOn()) { //send entries that report "LinkOn"
+                inTable_tmp = new Node_data(inTable.getIp_addr(), inTable.getPort(),
+                        inTable.getCost_weight(), false, null); //i assume that my neighbors are not other's neighbors
+                //i am the sender, so i have to update nh_info
+                inTable_tmp.setNh_ipaddr(get_myData().getIp_addr());
+                inTable_tmp.setNh_port(get_myData().getNh_port());
+
+                srtable += ("::") + inTable_tmp.createMsg("ROUTING UPDATE");
+            }
+
+        }
+        srtable += "]"; //closing msg string
+
+        return srtable;
+
     }
 
     public void showTable() {
@@ -319,10 +423,17 @@ public class Client {
                 st[i] = args[i] + args[i + 1] + args[i + 2];
 
             }
-            
+
         } else {
             System.err.println("possible input error");
             System.exit(-1);
         }
+    }
+
+    /**
+     * @return the rTable
+     */
+    public Hashtable<String, Node_data> getrTable() {
+        return rTable;
     }
 }
