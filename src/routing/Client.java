@@ -4,7 +4,6 @@
 package routing;
 
 import java.net.Inet4Address;
-import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -35,9 +34,14 @@ public class Client {
     private boolean debug = false;
     private Hashtable<String, Node_data> rTable = null;
     private Node_data my_data = null;
+    private SND_thread sender = null;
+    private long timer;
 
     public Client(int myPort, int send_timer, String... node_data) {
         rTable = new Hashtable<String, Node_data>();
+        timer = send_timer*1000;
+
+
         String nodes = "",
                 myIpaddr = "";
         try {
@@ -49,7 +53,8 @@ public class Client {
                 }
                 if (!net.isLoopback()) {
                     Enumeration conn_addr = net.getInetAddresses();
-//System.err.printf("oops in!!-%s\n",net.toString());
+                    //System.err.printf("oops in!!-%s\n",net.toString());
+                    
                     if (conn_addr.hasMoreElements()) {
                         try {
                             Inet4Address addr = (Inet4Address) conn_addr.nextElement();
@@ -95,6 +100,13 @@ public class Client {
         my_data.setNh_ipaddr(myIpaddr);
         my_data.setNh_port(myPort);
 
+        //create the sender
+        // Thread sender = null; new SND_thread(this, ngb_addrs);
+
+        //create the receiver
+
+        //create the command manager
+
         //initialize node table with neighbors
         initialize(nodes);
     }
@@ -105,7 +117,7 @@ public class Client {
      * @param node_msg string of the form [{ type, ip_addr, port, cost,
      * isNeighbor, nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, -,
      * end}]
-     * @return
+     * @return boolean true if init succeeded, false otherwise
      */
     public boolean initialize(String node_msg) {
         if (debug) {//debug
@@ -198,7 +210,8 @@ public class Client {
      * work on link on/off ????????????????????
      */
     public boolean update_dv(Hashtable<String, Node_data> inputDVEntry, Hashtable<String, Node_data> routingTB) {
-        boolean success = false;
+        boolean success = false,
+                allow_send = true;
         //--- 
 
         //1. fill/update entries to which I(this client) am the source node
@@ -314,7 +327,7 @@ public class Client {
         //--???2. for each node(except me), compute cost using bellman-ford equation
 
         //if there has been a change in the table, we call the sender
-        boolean allow_send = true;
+
         if (allow_send) {//rtb_updated
             in_keys = routingTB.keys();
             String ngb_addrs = "";
@@ -327,7 +340,13 @@ public class Client {
                 }
             }
 
-            new SND_thread(this, ngb_addrs).start();
+            if (sender != null) { //interrupt
+                sender.setNode_ns(ngb_addrs);
+                sender.interrupt();
+            } else { //create and start it
+                sender = new SND_thread(this, ngb_addrs, timer);
+                sender.start();
+            }
         }
         //---
         return success;
