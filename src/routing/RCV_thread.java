@@ -34,6 +34,12 @@ public class RCV_thread extends Thread {
     private boolean debug = false;
     DatagramPacket packet = null;
 
+    /**
+     * create RCV_thread object
+     * @param me_node Client :the client node that we are going to receive message for,
+     *          it is generally the caller of this thread
+     * @param port int :port to listen to for incoming routing messages(udp packets) 
+     */
     public RCV_thread(Client me_node, int port) {
         meNode = me_node;
         owner_port = port;

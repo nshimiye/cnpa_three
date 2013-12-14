@@ -48,7 +48,7 @@ Client nd1;
         System.out.printf("\n\n\t\t\t\t------------test client-----------\n\n");
         // testing the client's methods
         // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
-         nd1 = new Client(20009, 5, "160.39.161.171 20001 0.1");
+         nd1 = new Client(20003, 5, "160.39.161.171 20000 0.1", "160.39.161.171 20009 0.1", "128.59.196.2 20001 0.1" );
          System.out.printf("\n%s\n", nd1.rTableForSND("128.59.196.2:20001"));
         nd1.showTable();
     }

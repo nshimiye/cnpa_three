@@ -75,7 +75,7 @@ public class Node_data {
         RoutingMsg += type + " , ";
         RoutingMsg += getIp_addr() + " , ";
         RoutingMsg += String.valueOf(getPort()) + " , ";
-        RoutingMsg += String.valueOf(getCost_weight()) + " , ";
+        RoutingMsg += String.format("%.1f", getCost_weight()) + " , ";
         RoutingMsg += String.valueOf(isNeighbor()) + " , ";
         RoutingMsg += getNh_ipaddr() + " , ";//info about next hop
         RoutingMsg += String.valueOf(getNh_port()) + " , ";//info about next hop

@@ -38,7 +38,7 @@ public class Client_test {
         routingTB.put(node_name, node);
 
         node = routingTB.get("127.0.0.1:400");
-Client nd1;
+        Client nd1;
         System.out.printf("\ntb entry: %s = %s \n", node_name, node.createMsg("ROUTING UPDATE"));
 
 //        System.out.printf("\n\n\t\t\t\t------------test client-----------\n\n");

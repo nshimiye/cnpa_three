@@ -64,11 +64,7 @@ public class SND_thread extends Thread {
         while (true) { //this stops only when client caller exits
 
             try {
-
-                
-
                 for (int i = 0; i < node_ns.length; i++) {
-
                     String ngb_name = node_ns[i]; //ip_addr:port
                     if (debug) {
                         System.err.printf("<%d>-nd_name=[%s]\n", i, ngb_name);
@@ -91,7 +87,7 @@ public class SND_thread extends Thread {
                         packet = new DatagramPacket(message.getBytes(), message.getBytes().length, Inet, port);
                         socket.send(packet);
                         
-                       if (true) System.out.printf("[SND_thread]:sending route update to [%s]\n", 
+                       if (true) System.out.printf("[SND_thread-%d]:sending route update to [%s]\n", i,
                                packet.getAddress().getHostAddress()); //to be fixed?????????
 
                         if (debug) {

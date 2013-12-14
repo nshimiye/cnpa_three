@@ -39,6 +39,7 @@ public class Client {
     private long timer;
     private boolean allow_send = false; //used to make allow sending route updates
     private final int MAX_UDP = 512;
+    private String routing_msg = "ROUTING";
 
     public Client(int myPort, int send_timer, String... node_data) {
         rTable = new Hashtable<String, Node_data>();
@@ -134,7 +135,7 @@ public class Client {
 
         //i have to be in the table first
         rTable.put(my_data.myName(), my_data);
-        
+
         boolean status = update_dv(inputDVector, getrTable());
 
         return status;
@@ -155,7 +156,7 @@ public class Client {
 
         Hashtable<String, Node_data> inputDVector = msg_parser(node_msg);
 
-        //check the existence of the Node_data object that contains data for sender_name node
+        //check the existence of the Node_data object that contains data for "sender_name" node
         Node_data nd = inputDVector.get(sender_name);
 
         if (nd != null) {
@@ -169,22 +170,49 @@ public class Client {
                 Node_data new_ngb = rTable.get(nd.myName());
                 if (new_ngb == null) { //it is a new node, so we save it
                     rTable.put(nd.myName(), nd);
-                    //set sender ppermissin on
+                    //set sender permission on
 
                 }
+
+
+                //---------------------clean up the routing table---------------
+                //useful when link down update is received
+
+                //run through rtable
+                Node_data nd_tmp = null;
+
+                Iterator<Map.Entry<String, Node_data>> tb_tmp = getrTable().entrySet().iterator();
+
+                while (tb_tmp.hasNext()) {
+                    nd_tmp = tb_tmp.next().getValue();
+                    //if entry reports that its nh is "sender_name" node
+                    if (nd_tmp.nhName().equals(sender_name)) {
+
+                        //then check if it is in the inputDVector
+                        Node_data new_tmp = inputDVector.get(nd_tmp.myName());
+
+                        if (new_tmp == null) {
+                            //if not delete(setlink to off and the cost to infinity=500) from the routing table
+                            nd_tmp.setCost_weight(500); //INF = 500
+                            nd_tmp.setLinkOn(false);
+                            setAllow_send(true);
+                        }
+                    }
+                }
+                //--------------------------------------------------------------
 
                 //updater
                 status = update_dv(inputDVector, getrTable());
 
 
             } else {
-                if (true) {//no debug
+                if (debug) {//no debug
                     System.out.printf("[reInit inside]: wrong message[%s], no update made \n", node_msg);
                 }
             }
 
         } else {
-            if (true) {// no debug
+            if (debug) {// no debug
                 System.out.printf("[reInit outside]: wrong message[%s], no update made \n", node_msg);
             }
         }
@@ -285,7 +313,7 @@ public class Client {
         //      we use the bellman-ford equation    
 
         //1.a update the ones that already exist in the table
-        Node_data input = null, current = null;
+        Node_data input = null, input_tmp = null, current = null;
         String in_name, curr_name;
         Enumeration<String> in_keys = inputDVEntry.keys();
         Enumeration<String> curr_keys = routingTB.keys();
@@ -315,12 +343,20 @@ public class Client {
 
                 //check if same objects and then compute update
                 if (in_name.equals(curr_name)) {
-                    input = inputDVEntry.get(in_name);
+                    input_tmp = inputDVEntry.get(in_name);
+                    input = new Node_data(input_tmp.getIp_addr(), input_tmp.getPort(),
+                            input_tmp.getCost_weight(), input_tmp.isNeighbor(), input_tmp.getLFC());
+
+                    input.setNh_ipaddr(input_tmp.getNh_ipaddr());
+                    input.setNh_port(input_tmp.getNh_port());
+                    input.setLinkOn(true);
+
+                    System.out.printf("[updatedv]: %s\n", input.nhName());
+
                     current = routingTB.get(curr_name);
                     // d_x(y) = min_v{ c(x,v) + d_v(y) }
 
-                    String src_name = input.getNh_ipaddr() + ":" + input.getNh_port();
-                    Node_data src = routingTB.get(src_name);
+                    Node_data src = routingTB.get(input.nhName());
 
                     if (src != null) { //each data entry has to have its sender already saved
                         double newcost = input.getCost_weight() + src.getCost_weight();
@@ -337,14 +373,14 @@ public class Client {
 
                             //here i have to update the LFC for input
 
+                            routingTB.remove(curr_name);
                             routingTB.put(curr_name, input);
-                            allow_send = true;
+                            setAllow_send(true);
                             //set sending flag on: not yet implemented??????????????????
 
                             //since each entry exist once, then finding means that
                             // we'r done searching, so ew can break inner loop
                             inputDVEntry.remove(input.myName());
-
                             break;
 
                         } //if names are different, i just go on
@@ -363,15 +399,22 @@ public class Client {
                 //if the entry is not found, then add it
                 current = routingTB.get(in_name);
                 if (current == null) {
-                    input = inputDVEntry.get(in_name);
-                    String src_name = input.getNh_ipaddr() + ":" + input.getNh_port();
-                    Node_data src = routingTB.get(src_name);
+
+                    input_tmp = inputDVEntry.get(in_name);
+                    input = new Node_data(input_tmp.getIp_addr(), input_tmp.getPort(),
+                            input_tmp.getCost_weight(), input_tmp.isNeighbor(), input_tmp.getLFC());
+
+                    input.setNh_ipaddr(input_tmp.getNh_ipaddr());
+                    input.setNh_port(input_tmp.getNh_port());
+                    input.setLinkOn(true);
+
+                    Node_data src = routingTB.get(input.nhName());
 
                     if (src != null || input.isNeighbor()) {
                         double newcost = 0;
-                        if (input.isNeighbor()) { //isnotnull
+                        if (input.isNeighbor()) { //isneighbor
                             newcost = input.getCost_weight();
-                        } else { //isneighbor
+                        } else { //isnotnull
                             newcost = input.getCost_weight() + src.getCost_weight();
                         }
 
@@ -385,7 +428,7 @@ public class Client {
 
                         //add
                         routingTB.put(in_name, input);
-                        allow_send = true;
+                        setAllow_send(true);
                     }
                     //remove
                     inputDVEntry.remove(in_name);
@@ -418,7 +461,7 @@ public class Client {
             }
 
 //            turn the send pprmission off
-            allow_send = false;
+            setAllow_send(false);
         }
         success = true;
         showTable();//-- to be removed
@@ -439,10 +482,10 @@ public class Client {
 
         while (tb_tmp.hasNext()) {
             nd = tb_tmp.next().getValue();
-            if(!nd.myName().equals(get_myData().myName())){
-            completeTB += "Destination = " + nd.myName()
-                    + ", Cost = " + nd.getCost_weight()
-                    + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
+            if (!nd.myName().equals(get_myData().myName())) {
+                completeTB += "Destination = " + nd.myName()
+                        + ", Cost = " + String.format("%.1f", nd.getCost_weight())
+                        + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
             }
         }
         return completeTB;
@@ -479,8 +522,6 @@ public class Client {
         inTable_tmp.setNh_port(get_myData().getNh_port());
         srtable += inTable_tmp.createMsg("ROUTING UPDATE");
 
-
-
         Enumeration<String> in_keys = inputDVEntry.keys();
         while (in_keys.hasMoreElements()) {
             in_name = in_keys.nextElement();
@@ -494,7 +535,7 @@ public class Client {
                 inTable_tmp.setNh_ipaddr(get_myData().getIp_addr());
                 inTable_tmp.setNh_port(get_myData().getNh_port());
 
-                srtable += ("::") + inTable_tmp.createMsg("ROUTING UPDATE");
+                srtable += ("::") + inTable_tmp.createMsg(routing_msg);
             }
 
         }
@@ -507,7 +548,7 @@ public class Client {
     public void showTable() {
         System.err.printf("=========  routing table  =========\n"
                 + "%s\n"
-                + "=========  end  =========", tableToString());
+                + "=========  end  =========\n", tableToString());
 
 
     }
@@ -535,5 +576,19 @@ public class Client {
      */
     public Hashtable<String, Node_data> getrTable() {
         return rTable;
+    }
+
+    /**
+     * @param allow_send boolean: the permission for SND_thread to send routing update 
+     */
+    public void setAllow_send(boolean allow_send) {
+        this.allow_send = allow_send;
+    }
+
+    /**
+     * @param routing_msg the routing_msg to set
+     */
+    public void setRouting_msg(String routing_msg) {
+        this.routing_msg = routing_msg;
     }
 }
