@@ -31,11 +31,20 @@ public class Node_data {
     }
     
     /**
-     * 
+     * shows the name <ip_addr:port> of the node whose data is represented by this Node_data object
      * @return String node_name, in the form ip_addr:port
      */
     public String myName(){
         String node_name = getIp_addr() + ":"+ String.valueOf(getPort());
+        return node_name;
+    }
+    
+    /**
+     * shows the name <ip_addr:port> of the next hope used to get to Node_data owner 
+     * @return String node_name, in the form ip_addr:port
+     */
+    public String nhName(){
+        String node_name = getNh_ipaddr()+ ":"+ String.valueOf(getNh_port());
         return node_name;
     }
     

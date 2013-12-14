@@ -5,7 +5,6 @@
 package routing;
 
 import java.util.Hashtable;
-import java.util.LinkedList;
 
 /**
  *
@@ -45,8 +44,8 @@ Client nd1;
 //        System.out.printf("\n\n\t\t\t\t------------test client-----------\n\n");
 //        // testing the client's methods
 //        // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
-//         nd1 = new Client(20000, 5, "128.59.196.2 20000 4.1", "128.59.196.2 20001 5.2", "128.59.196.4 20000 3");
-//        nd1.showTable();
+//         nd1 = new Client(20001, 5, "160.39.161.171 20000 9.1");
+        //nd1.showTable();
 
 
         System.out.printf("\n\n\t\t\t\t------------test client stage 2-----------\n\n");
@@ -68,7 +67,7 @@ Client nd1;
         // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
         nd1 = new Client(20000, 5, st);
 
-        System.out.printf("\n%s\n", nd1.rTableForSND());
-        nd1.showTable();
+        System.out.printf("\n%s\n", nd1.rTableForSND("128.59.196.2:20001"));
+//        //nd1.showTable();
     }
 }

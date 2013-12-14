@@ -29,10 +29,12 @@ public class SND_thread extends Thread {
     private Client selfNode = null;
     private String message = null;
     private String[] node_ns = null;
-    private long timeout = 300;
+    private long timeout = 3000;
     protected DatagramSocket socket = null;
-    private boolean debug = false;
+    
+    private final int MAX_UDP = 1024;
 
+    private boolean debug = false;
     /**
      *
      * @param me_node Client :the client/host node, this client should own this
@@ -63,7 +65,7 @@ public class SND_thread extends Thread {
 
             try {
 
-                message = selfNode.rTableForSND();
+                
 
                 for (int i = 0; i < node_ns.length; i++) {
 
@@ -71,6 +73,9 @@ public class SND_thread extends Thread {
                     if (debug) {
                         System.err.printf("<%d>-nd_name=[%s]\n", i, ngb_name);
                     }
+                    
+                    message = selfNode.rTableForSND(ngb_name);
+                    
                     String[] ngb_name_tmp = ngb_name.split(":"); //split ip_addr:port
                     String ip_addr = ngb_name_tmp[0]; // ip_addr
                     int port = Integer.valueOf(ngb_name_tmp[1]);// port

@@ -35,12 +35,14 @@ public class Client {
     private Hashtable<String, Node_data> rTable = null;
     private Node_data my_data = null;
     private SND_thread sender = null;
+    private RCV_thread receiver = null;
     private long timer;
+    private boolean allow_send = false; //used to make allow sending route updates
+    private final int MAX_UDP = 512;
 
     public Client(int myPort, int send_timer, String... node_data) {
         rTable = new Hashtable<String, Node_data>();
-        timer = send_timer*1000;
-
+        timer = send_timer * 1000;
 
         String nodes = "",
                 myIpaddr = "";
@@ -54,7 +56,7 @@ public class Client {
                 if (!net.isLoopback()) {
                     Enumeration conn_addr = net.getInetAddresses();
                     //System.err.printf("oops in!!-%s\n",net.toString());
-                    
+
                     if (conn_addr.hasMoreElements()) {
                         try {
                             Inet4Address addr = (Inet4Address) conn_addr.nextElement();
@@ -99,16 +101,21 @@ public class Client {
         my_data = new Node_data(myIpaddr, myPort, 0, false, null);
         my_data.setNh_ipaddr(myIpaddr);
         my_data.setNh_port(myPort);
+        my_data.setLinkOn(false);
 
         //create the sender
         // Thread sender = null; new SND_thread(this, ngb_addrs);
 
         //create the receiver
+        receiver = new RCV_thread(this, myPort);
 
         //create the command manager
 
         //initialize node table with neighbors
         initialize(nodes);
+
+        //after init then we can start receiving
+        receiver.start();
     }
 
     /**
@@ -121,30 +128,90 @@ public class Client {
      */
     public boolean initialize(String node_msg) {
         if (debug) {//debug
-
-            System.out.printf(">>>>>> [%s]\n", node_msg);
+            System.out.printf("[initialize]: >>>>>> [%s]\n", node_msg);
         }
         Hashtable<String, Node_data> inputDVector = msg_parser(node_msg);
 
+        //i have to be in the table first
+        rTable.put(my_data.myName(), my_data);
+        
         boolean status = update_dv(inputDVector, getrTable());
 
         return status;
     }
 
+    /**
+     *
+     * @param sender_name String :name(<ip_addr:port>) of the node, sender of
+     * message "node_msg"
+     * @param node_msg String :message received via UDP protocol
+     * @return
+     */
+    public boolean reInit(String sender_name, String node_msg) {
+        boolean status = false;
+        if (true) {// no debug
+            System.out.printf("[reInit]: %s>>>>>> [%s]\n", sender_name, node_msg);
+        }
+
+        Hashtable<String, Node_data> inputDVector = msg_parser(node_msg);
+
+        //check the existence of the Node_data object that contains data for sender_name node
+        Node_data nd = inputDVector.get(sender_name);
+
+        if (nd != null) {
+            if (nd.myName().equals(nd.nhName())) {
+
+                //in here, we know that our table can be updated safely
+
+                //save neighbor entry if not already saved first
+                nd.setLinkOn(true);
+                nd.setIsneighbor(true);
+                Node_data new_ngb = rTable.get(nd.myName());
+                if (new_ngb == null) { //it is a new node, so we save it
+                    rTable.put(nd.myName(), nd);
+                    //set sender ppermissin on
+
+                }
+
+                //updater
+                status = update_dv(inputDVector, getrTable());
+
+
+            } else {
+                if (true) {//no debug
+                    System.out.printf("[reInit inside]: wrong message[%s], no update made \n", node_msg);
+                }
+            }
+
+        } else {
+            if (true) {// no debug
+                System.out.printf("[reInit outside]: wrong message[%s], no update made \n", node_msg);
+            }
+        }
+
+        return status;
+    }
+
+    /**
+     * give access to the data of this node Note: node address and its nh's
+     * address are the same (nh: next hope)
+     *
+     * @return Node_data
+     */
     public Node_data get_myData() {
 
         return my_data;
     }
 
     /**
-     * create first entries, they are supposed to be neighbors
+     * Creating routing table entries from the string object (ROUTE UPDATE's)
      *
      * @param node_msg String format [{ type, ip_addr, port, cost, isNeighbor,
      * nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, -, end}]
      * @return
      */
     public Hashtable<String, Node_data> msg_parser(String node_msg) {
-        boolean success = false;
+
         Hashtable<String, Node_data> inputDV = new Hashtable<String, Node_data>();
         //for now "type" entry is not in use: assume to always be ROUTE UPDATE
         //[{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, 0, end} :: ...]
@@ -210,8 +277,8 @@ public class Client {
      * work on link on/off ????????????????????
      */
     public boolean update_dv(Hashtable<String, Node_data> inputDVEntry, Hashtable<String, Node_data> routingTB) {
-        boolean success = false,
-                allow_send = true;
+        boolean success = false;
+
         //--- 
 
         //1. fill/update entries to which I(this client) am the source node
@@ -271,6 +338,7 @@ public class Client {
                             //here i have to update the LFC for input
 
                             routingTB.put(curr_name, input);
+                            allow_send = true;
                             //set sending flag on: not yet implemented??????????????????
 
                             //since each entry exist once, then finding means that
@@ -317,6 +385,7 @@ public class Client {
 
                         //add
                         routingTB.put(in_name, input);
+                        allow_send = true;
                     }
                     //remove
                     inputDVEntry.remove(in_name);
@@ -347,7 +416,12 @@ public class Client {
                 sender = new SND_thread(this, ngb_addrs, timer);
                 sender.start();
             }
+
+//            turn the send pprmission off
+            allow_send = false;
         }
+        success = true;
+        showTable();//-- to be removed
         //---
         return success;
     }
@@ -365,9 +439,11 @@ public class Client {
 
         while (tb_tmp.hasNext()) {
             nd = tb_tmp.next().getValue();
+            if(!nd.myName().equals(get_myData().myName())){
             completeTB += "Destination = " + nd.myName()
                     + ", Cost = " + nd.getCost_weight()
                     + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
+            }
         }
         return completeTB;
     }
@@ -380,10 +456,12 @@ public class Client {
      * @return String
      *
      */
-    public String rTableForSND() {
+    public String rTableForSND(String dst_name) {
         String srtable = "[", in_name;
 
         Node_data inTable = null, inTable_tmp;
+
+        Hashtable<String, Node_data> inputDVEntry = getrTable();
 
         /*
          * add self info to the message
@@ -391,15 +469,18 @@ public class Client {
          *          (same for all neighbors for now and is 1) to the neighbors
          *         and it gets used when the sender is joining the net
          */
+
+        Node_data dst_tmp = inputDVEntry.get(dst_name);
         inTable = get_myData();
         inTable_tmp = new Node_data(inTable.getIp_addr(), inTable.getPort(),
-                inTable.getCost_weight() + 1, true, null);
+                ((dst_tmp != null) ? dst_tmp.getCost_weight() : 1), true, null);
         //i am the sender, so i have to update nh_info
         inTable_tmp.setNh_ipaddr(get_myData().getIp_addr());
         inTable_tmp.setNh_port(get_myData().getNh_port());
         srtable += inTable_tmp.createMsg("ROUTING UPDATE");
 
-        Hashtable<String, Node_data> inputDVEntry = getrTable();
+
+
         Enumeration<String> in_keys = inputDVEntry.keys();
         while (in_keys.hasMoreElements()) {
             in_name = in_keys.nextElement();
@@ -424,11 +505,11 @@ public class Client {
     }
 
     public void showTable() {
-        System.out.println("=========  routing table  =========");
+        System.err.printf("=========  routing table  =========\n"
+                + "%s\n"
+                + "=========  end  =========", tableToString());
 
-        System.out.printf("%s", tableToString());
 
-        System.out.println("=========  end  =========");
     }
 
     /**
