@@ -11,6 +11,8 @@ package routing;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
+import java.util.Hashtable;
+import java.util.Queue;
 
 /**
  *
@@ -53,13 +55,18 @@ public class RCV_thread extends Thread {
             //then kill the system
             System.err.printf("[CMD_manager]: Client exiting ...\n");
             System.exit(-1);
-            
+
         }
 
     }
 
     @Override
     public void run() {
+
+        String head_name;
+        //1. Get the routing table from the client
+        Hashtable<String, Node_data> cmd_rTable;
+        Node_data ndt;
 
         while (true) { //this stops only when client caller exits
             if (stop) {
@@ -73,7 +80,7 @@ public class RCV_thread extends Thread {
                 getSocket().receive(packet);
 
                 String message = new String(packet.getData());
-                //message is of format: [{}::{}::{}...]
+                //message is of format: [{}::{}::{}...] or [lINKDOWN/LINKUP::<node_name>]
                 if (debug) {
                     System.err.printf("[RCV_thread]: rcved msg=[%s]\n", message);
                 }
@@ -81,19 +88,77 @@ public class RCV_thread extends Thread {
                 //parse the packet data and create the sender's name
                 String message_tmp = message;
                 message_tmp = message_tmp.replace('[', ' ');
-                String head = message_tmp.split("::")[0]; //{ROUTE UPDATE, ip_addr, port, cost, true, nhAddr, nhPport, end}
-                String[] head_tmp = head.trim().split(",");
-                String head_name = head_tmp[1].trim() + ":" + head_tmp[2].trim();
+                message_tmp = message_tmp.replace(']', ' ');
 
-                boolean status = meNode.reInit(head_name, message);
-                if (!status) {//if reInit exec reports false, then it means no uppdate has been made
-                    System.out.printf("[RCV_thread]: reInit failed, no table update made \n");
+                String[] attempt_link = message_tmp.split("::"); //meaning assume we have LINKUP/DOWN
+
+                String head = attempt_link[0]; //{ROUTING, ip_addr, port, cost, true, nhAddr, nhPport, end}
+
+
+                if (head.trim().equals("LINKUP")) {
+                    head_name = attempt_link[1];
+                    //1. Get the routing table from the client
+                    cmd_rTable = meNode.getrTable();
+                    ndt = cmd_rTable.get(head_name);
+
+                    if (ndt != null) {
+                        //2. Set this node to offline (:linkon=false)
+                        ndt.setLinkOn(true);
+                        ndt.setIsneighbor(true);
+                        LFC_thread lfc = new LFC_thread(meNode, ndt, meNode.getTimer());
+                        ndt.setLFC(lfc);
+
+                        System.out.printf("waiking link to <%s>\n", ndt.myName());
+                        /*
+                         * enable the "alow_send" only
+                         * and not worry about the locking system
+                         */
+                        meNode.setAllow_send(true);
+                        //meNode.setRouting_msg("LINKDOWN");
+                    }
+                } else if (head.trim().equals("LINKDOWN")) {
+                    //we just clear or enable the link
+                    //here possible race condition with the RCV_thread
+                    head_name = attempt_link[1];
+                    //1. Get the routing table from the client
+                    cmd_rTable = meNode.getrTable();
+                    ndt = cmd_rTable.get(head_name);
+
+                    if (ndt != null) {
+                        //2. Set this node to offline (:linkon=false)
+                        ndt.setLinkOn(false);
+                        //ndt.setIsneighbor(true);
+                        if (ndt.LFC_isAlive()) {
+                            ndt.getLFC().setStop(true);
+                            ndt.getLFC().interrupt();
+                            ndt.setLFC(null);
+                        }
+
+                        System.out.printf("waiking link to <%s>\n", ndt.myName());
+                        /*
+                         * enable the "alow_send" only
+                         * and not worry about the locking system
+                         */
+                        meNode.setAllow_send(true);
+                        //meNode.setRouting_msg("LINKDOWN");
+                    }
+
+                } else {
+
+
+                    //String head = message_tmp.split("::")[0]; //{ROUTE UPDATE, ip_addr, port, cost, true, nhAddr, nhPport, end}
+                    String[] head_tmp = head.trim().split(",");
+                    head_name = head_tmp[1].trim() + ":" + head_tmp[2].trim();
+
+                    boolean status = meNode.reInit(head_name, message);
+                    if (!status) {//if reInit exec reports false, then it means no uppdate has been made
+                        System.out.printf("[RCV_thread]: reInit failed, no table update made \n");
+                    }
+
+                    if (debug) {
+                        System.err.printf("[RCV_thread]: rcved msg=[%s]\n", message);
+                    }
                 }
-
-                if (debug) {
-                    System.err.printf("[RCV_thread]: rcved msg=[%s]\n", message);
-                }
-
             } catch (Exception ex) {
                 System.err.printf("\n[RCV_thread]: Error receiving this data \n ==%s\n", ex.toString());
             }

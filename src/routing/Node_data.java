@@ -17,55 +17,61 @@ public class Node_data {
     private int port;
     private double cost_weight;
     private boolean linkOn, isneighbor;
-    private Thread LFC; //link failure checker
-    
+    private LFC_thread LFC = null; //link failure checker
     //let's add the src where this data is coming from
     private String nh_ipaddr = "-"; //default
     private int nh_port = 0; //default
 
-    public Node_data(String ip_address, int node_port, double cost, boolean neighbor, Thread LFC_used) {
+    public Node_data(String ip_address, int node_port, double cost, boolean neighbor, LFC_thread LFC_used) {
         ip_addr = ip_address;
         port = node_port;
         cost_weight = cost;
         isneighbor = neighbor;
+        LFC = LFC_used;
     }
-    
+
     /**
-     * shows the name <ip_addr:port> of the node whose data is represented by this Node_data object
+     * shows the name <ip_addr:port> of the node whose data is represented by
+     * this Node_data object
+     *
      * @return String node_name, in the form ip_addr:port
      */
-    public String myName(){
-        String node_name = getIp_addr() + ":"+ String.valueOf(getPort());
+    public String myName() {
+        String node_name = getIp_addr() + ":" + String.valueOf(getPort());
         return node_name;
     }
-    
+
     /**
-     * shows the name <ip_addr:port> of the next hope used to get to Node_data owner 
+     * shows the name <ip_addr:port> of the next hope used to get to Node_data
+     * owner
+     *
      * @return String node_name, in the form ip_addr:port
      */
-    public String nhName(){
-        String node_name = getNh_ipaddr()+ ":"+ String.valueOf(getNh_port());
+    public String nhName() {
+        String node_name = getNh_ipaddr() + ":" + String.valueOf(getNh_port());
         return node_name;
     }
-    
+
     /**
-     * getDventry 
-     * short for distance vector entry, this is very helpful when you
+     * getDventry short for distance vector entry, this is very helpful when you
      * need to display routing info as described in the homework
+     *
      * @return String <destination, cost> tuple for this(Node_data) data object
      */
-    public String getDventry(){
+    public String getDventry() {
         String dventry = ""; //entry <> for this linked node
-        dventry += "< " + getIp_addr() + ", " + String.valueOf(getCost_weight()) +">";
-                
+        dventry += "< " + getIp_addr() + ", " + String.valueOf(getCost_weight()) + ">";
+
         return dventry;
     }
 
     /**
      * format used is similar to json, except
      *
-     * @param type String (ROUTE UPDATE, INIT, SELF) specifies the type of message created (not important for now)
-     * @return the message in the format { type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end}, '-' specifies null
+     * @param type String (ROUTE UPDATE, INIT, SELF) specifies the type of
+     * message created (not important for now)
+     * @return the message in the format { type, ip_addr, port, cost,
+     * isNeighbor, nh_addr, nh_port, end}, '-' specifies null
      */
     public String createMsg(String type) {
 
@@ -141,28 +147,35 @@ public class Node_data {
     }
 
     /**
-     * LFC_isAlive
-     * make sue the the link failure checker thread is not null
-     * @return 
+     * LFC_isAlive make sue the the link failure checker thread is not null
+     *
+     * @return
      */
     public boolean LFC_isAlive() {
         return getLFC() != null;
     }
 
     /**
-     * this in charge of passing the thread responsible link timeout and disconnection 
+     * this in charge of passing the thread responsible link timeout and
+     * disconnection
+     *
      * @return Thread LFC, the Link failure Checker
      */
-    public Thread getLFC() {
+    public LFC_thread getLFC() {
         return LFC;
     }
 
     /**
      * initialize the link failure checker thread
+     * and then start it
+     * Note: we assume the input thread has not been started
      * @param LFC the LinkFailureChecker to this Node_data
      */
-    public void setLFC(Thread LFC) {
+    public void setLFC(LFC_thread LFC) {
         this.LFC = LFC;
+        if (this.LFC != null) {
+            this.LFC.start();
+        }
     }
 
     /**
@@ -195,6 +208,7 @@ public class Node_data {
 
     /**
      * Specifies if the node whos data is "this" is connected
+     *
      * @return boolean linkOn: true if connected/reachable, false otherwise
      */
     public boolean isLinkOn() {
@@ -203,7 +217,8 @@ public class Node_data {
 
     /**
      * turn link on or off (off means it is not part of the routing table)
-     * @param linkOn the boolean value specifying the state of the node 
+     *
+     * @param linkOn the boolean value specifying the state of the node
      */
     public void setLinkOn(boolean linkOn) {
         this.linkOn = linkOn;

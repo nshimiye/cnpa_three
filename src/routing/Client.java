@@ -36,7 +36,8 @@ public class Client {
     private Node_data my_data = null;
     private SND_thread sender = null;
     private RCV_thread receiver = null;
-    private long timer;
+    LFC_thread lfc = null;
+    private long timer = 3000;
     private boolean allow_send = false; //used to make allow sending route updates
     private final int MAX_UDP = 1024;
     private final double INF = 500;
@@ -114,6 +115,7 @@ public class Client {
         my_data.setNh_ipaddr(myIpaddr);
         my_data.setNh_port(myPort);
         my_data.setLinkOn(false);
+        my_data.setLFC(null);
 
         //create the sender
         // Thread sender = null; new SND_thread(this, ngb_addrs);
@@ -178,11 +180,23 @@ public class Client {
                 //save neighbor entry if not already saved first
                 nd.setLinkOn(true);
                 nd.setIsneighbor(true);
+
                 Node_data new_ngb = rTable.get(nd.myName());
                 if (new_ngb == null) { //it is a new node, so we save it
+                    if (!nd.LFC_isAlive()) {
+                        lfc = new LFC_thread(this, nd, this.getTimer());
+                        nd.setLFC(lfc);
+                    }
                     rTable.put(nd.myName(), nd);
                     //set sender permission on
 
+                } else {
+                    if (nd.LFC_isAlive()) {
+                        nd.getLFC().interrupt();
+                    }else{ //unlikely to happen
+                        lfc = new LFC_thread(this, nd, this.getTimer());
+                        nd.setLFC(lfc);
+                    }
                 }
 
 
@@ -207,6 +221,9 @@ public class Client {
                             nd_tmp.setCost_weight(INF); //INF = 500
                             nd_tmp.setLinkOn(false);
                             setAllow_send(true);
+
+                            rTable.remove(new_tmp); //carefull?????????????
+
                         }
                     }
                 }
@@ -285,7 +302,7 @@ public class Client {
             String nh_addr = entry[5].trim(); //default = -
             int nh_port = Integer.valueOf(entry[6].trim()); //default = 0
 
-            Thread lfc = null;
+            LFC_thread lfc = null;
             //=========================
 
             Node_data new_item = new Node_data(ipaddr, port, cost, isngb, lfc);
@@ -429,6 +446,10 @@ public class Client {
                         double newcost = 0;
                         if (input.isNeighbor()) { //isneighbor
                             newcost = input.getCost_weight();
+
+                            lfc = new LFC_thread(this, input, this.getTimer());
+                            input.setLFC(lfc);
+
                         } else { //isnotnull
                             newcost = input.getCost_weight() + src.getCost_weight();
                         }
@@ -456,22 +477,15 @@ public class Client {
         //if there has been a change in the table, we call the sender
 
         if (allow_send) {//rtb_updated
-            in_keys = routingTB.keys();
-            String ngb_addrs = "";
-            Node_data inTable = null;
-            while (in_keys.hasMoreElements()) {
-                in_name = in_keys.nextElement();
-                inTable = routingTB.get(in_name);
-                if (inTable.isNeighbor() && inTable.isLinkOn()) {
-                    ngb_addrs += ((ngb_addrs.trim().equals("")) ? "" : ",") + inTable.myName();
-                }
-            }
+
+            String ngb_addrs = getNeighbors();
+
 
             if (getSender() != null) { //interrupt
                 getSender().setNode_ns(ngb_addrs);
                 getSender().interrupt();
             } else { //create and start it
-                sender = new SND_thread(this, ngb_addrs, timer);
+                sender = new SND_thread(this, ngb_addrs, getTimer());
                 getSender().start();
             }
 
@@ -482,6 +496,22 @@ public class Client {
         //showTable();//-- to be removed
         //---
         return success;
+    }
+
+    public String getNeighbors() {
+
+        Enumeration<String> in_keys = rTable.keys();
+        String ngb_addrs = "", in_name;
+        Node_data inTable = null;
+        while (in_keys.hasMoreElements()) {
+            in_name = in_keys.nextElement();
+            inTable = rTable.get(in_name);
+            if (inTable.isNeighbor() && inTable.isLinkOn()) {
+                ngb_addrs += ((ngb_addrs.trim().equals("")) ? "" : ",") + inTable.myName();
+            }
+        }
+
+        return ngb_addrs;
     }
 
     /**
@@ -568,22 +598,6 @@ public class Client {
     }
 
     /**
-     * @param args the command line arguments
-     */
-    public static void main(String[] args) {
-
-        if (args.length % 3 == 0) {
-            String[] st = new String[args.length / 3];
-            for (int i = 0; i < args.length; i += 3) {
-                st[i] = args[i] + args[i + 1] + args[i + 2];
-            }
-        } else {
-            System.err.println("possible input error");
-            System.exit(-1);
-        }
-    }
-
-    /**
      * @return the rTable
      */
     public Hashtable<String, Node_data> getrTable() {
@@ -618,4 +632,35 @@ public class Client {
     public RCV_thread getReceiver() {
         return receiver;
     }
+
+    /**
+     * @return the timer
+     */
+    public long getTimer() {
+        return timer;
+    }
+
+    /**
+     * @param timer the timer to set
+     */
+    public void setTimer(long timer) {
+        this.timer = timer;
+    }
+    /**
+     * @param args the command line arguments
+     */
+    /*
+     public static void main(String[] args) {
+
+     if (args.length % 3 == 0) {
+     String[] st = new String[args.length / 3];
+     for (int i = 0; i < args.length; i += 3) {
+     st[i] = args[i] + args[i + 1] + args[i + 2];
+     }
+     } else {
+     System.err.println("possible input error");
+     System.exit(-1);
+     }
+     }
+     */
 }

@@ -12,6 +12,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Hashtable;
+import java.util.Queue;
 import java.util.Scanner;
 
 /**
@@ -89,11 +90,16 @@ public class CMD_manager {
 
             //wait for input command
             cmd_tmp = inp.nextLine();
-            if(false){System.out.printf("entry = %s\n", cmd_tmp);}
+            if (false) {
+                System.out.printf("entry = %s\n", cmd_tmp);
+            }
             cmd = cmd_tmp.trim().split(" ");
-            if(false){System.out.printf("command = %s\n", cmd[0]);}
+            if (false) {
+                System.out.printf("command = %s\n", cmd[0]);
+            }
             //processing together with outputting results
             if (cmd.length >= 1) {
+
                 switch (cmd[0].toUpperCase()) {
 
                     //SHOWRT –
@@ -105,13 +111,11 @@ public class CMD_manager {
 
                     // LINKDOWN {ip_address port} –
                     case "LINKDOWN":
-
                         if (cmd.length != 3) {
                             System.err.printf("[CMD_manager]: wrong use of the command ...\n");
                         } else { //here we start the linkdown operation
 
                             //here possible race condition with the RCV_thread
-
                             String head_name = cmd[1].trim() + ":" + cmd[2].trim();
                             //1. Get the routing table from the client
                             Hashtable<String, Node_data> cmd_rTable = meNode.getrTable();
@@ -120,10 +124,26 @@ public class CMD_manager {
                             if (ndt != null) {
                                 //2. Set this node to offline (:linkon=false)
                                 ndt.setLinkOn(false);
-                                ndt.setIsneighbor(false);
+                                //ndt.setIsneighbor(false);
+                                if (ndt.LFC_isAlive()) {
+                                    ndt.getLFC().setStop(true);
+                                    ndt.getLFC().interrupt();
+                                    ndt.setLFC(null);
+                                }
+
+                                //put Linkdown message in queue and interrupt
+                                Queue<String[]> msg_queue = meNode.getSender().getMsg_queue();
+                                String[] msg = new String[2];
+                                msg[0] = "LINKDOWN";
+                                msg[1] = ndt.myName();
+                                msg_queue.add(msg);
+
+                                meNode.getSender().setSingle_snd(true);
+                                meNode.getSender().setNode_ns(meNode.getNeighbors());
+                                meNode.getSender().interrupt();
+
                                 System.out.printf("clearing link to <%s>\n", ndt.myName());
                                 //ndt.setCost_weight(500); //this is infinity
-
                                 /*
                                  * 3.tell the client to send LINK DWON update
                                  * this is not necessary if RCV_thread is processing
@@ -140,7 +160,7 @@ public class CMD_manager {
                                  * and not worry about the locking system
                                  */
                                 meNode.setAllow_send(true);
-                                meNode.setRouting_msg("LINKDOWN");
+                                //meNode.setRouting_msg("LINKDOWN");
                                 //  boolean status = meNode.reInit(head_name, message);
                             }
                         }
@@ -153,7 +173,6 @@ public class CMD_manager {
                         } else { //here we start the linkdown operation
 
                             //here possible race condition with the RCV_thread
-
                             String head_name = cmd[1].trim() + ":" + cmd[2].trim();
                             //1. Get the routing table from the client
                             Hashtable<String, Node_data> cmd_rTable = meNode.getrTable();
@@ -163,16 +182,27 @@ public class CMD_manager {
                                 //2. Set this node to offline (:linkon=false)
                                 ndt.setLinkOn(true);
                                 ndt.setIsneighbor(true);
+                                LFC_thread lfc = new LFC_thread(meNode, ndt, meNode.getTimer());
+                                ndt.setLFC(lfc);
+
+                                //put Linkdown message in queue and interrupt
+                                Queue<String[]> msg_queue = meNode.getSender().getMsg_queue();
+                                String[] msg = new String[2];
+                                msg[0] = "LINKUP";
+                                msg[1] = ndt.myName();
+                                msg_queue.add(msg);
+                                meNode.getSender().setSingle_snd(true);
+                                meNode.getSender().setNode_ns(meNode.getNeighbors());
+                                meNode.getSender().interrupt();
+
                                 System.out.printf("waiking link to <%s>\n", ndt.myName());
                                 /*
                                  * enable the "alow_send" only
                                  * and not worry about the locking system
                                  */
                                 meNode.setAllow_send(true);
-                                meNode.setRouting_msg("LINKDOWN");
+                                //meNode.setRouting_msg("LINKDOWN");
                             }
-
-
                         }
                         break;
 
@@ -227,7 +257,7 @@ public class CMD_manager {
      * @param args the command line arguments
      */
     public static void main(String[] args_saved) {
-        int port = 20005;
+        int port = 20001;
         long timer = 5;
 //        if(args.length < 2){        
 //            System.err.println("usage: java CMD_manager <localport> <timeout> <[ipaddress1 port1 weight1 ...]>\n");
