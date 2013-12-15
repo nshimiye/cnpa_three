@@ -75,6 +75,9 @@ public class SND_thread extends Thread {
         int port;// port
 
         while (true) { //this stops only when client caller exits
+            if (debug) {
+                System.err.printf("[SND_thread]: sending ...\n");
+            }
             if (stop) {
                 break;
             }
@@ -82,30 +85,34 @@ public class SND_thread extends Thread {
             try {
 
                 if (single_snd) { //linkdown and linkup
+
                     while (!msg_queue.isEmpty()) {
                         //format: [0] = LINKDOWN, LINKUP, [ROUTING] 
                         //        [1] = node_name or [all]
                         String[] msg_snd = getMsg_queue().poll();
-                        String type = msg_snd[0];
-                        String nd_name = msg_snd[1]; //assume this is always 2
+                        if (msg_snd != null) {
+                            System.out.printf("[SND_thread]:= [%d]\n", msg_snd.length);
+                            String type = msg_snd[0];
+                            String nd_name = msg_snd[1]; //assume this is always 2
 
-                        String tobesent = "[" + type.trim() + "::" + selfNode.get_myData().myName().trim() + "]";
+                            String tobesent = "[" + type.trim() + "::" + selfNode.get_myData().myName().trim() + "]";
 
-                        ngb_name_tmp = nd_name.split(":"); //split ip_addr:port
-                        ip_addr = ngb_name_tmp[0].trim(); // ip_addr
-                        port = Integer.valueOf(ngb_name_tmp[1].trim());// port
+                            ngb_name_tmp = nd_name.split(":"); //split ip_addr:port
+                            ip_addr = ngb_name_tmp[0].trim(); // ip_addr
+                            port = Integer.valueOf(ngb_name_tmp[1].trim());// port
 
-                        try {
-                            InetAddress Inet = InetAddress.getByName(ip_addr);
-                            if (debug) {
-                                System.err.printf("[==SND_thread==]:- = [%s]\n", Inet.toString());
+                            try {
+                                InetAddress Inet = InetAddress.getByName(ip_addr);
+                                if (debug) {
+                                    System.err.printf("[==SND_thread==]:- = [%s]\n", Inet.toString());
+                                }
+                                packet = new DatagramPacket(tobesent.getBytes(), tobesent.getBytes().length, Inet, port);
+                                getSocket().send(packet);
+
+
+                            } catch (Exception ex) {
+                                System.err.printf("\n[SND_thread]: Error sending this data \n ==%s\n", ex.toString());
                             }
-                            packet = new DatagramPacket(tobesent.getBytes(), tobesent.getBytes().length, Inet, port);
-                            getSocket().send(packet);
-
-
-                        } catch (Exception ex) {
-                            System.err.printf("\n[SND_thread]: Error sending this data \n ==%s\n", ex.toString());
                         }
                     }
                     single_snd = false;

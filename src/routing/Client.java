@@ -205,7 +205,6 @@ public class Client {
 
                 //run through rtable
                 Node_data nd_tmp = null;
-
                 Iterator<Map.Entry<String, Node_data>> tb_tmp = getrTable().entrySet().iterator();
 
                 while (tb_tmp.hasNext()) {
@@ -222,8 +221,7 @@ public class Client {
                             nd_tmp.setLinkOn(false);
                             setAllow_send(true);
 
-                            rTable.remove(new_tmp); //carefull?????????????
-
+                            rTable.remove(new_tmp.myName()); //carefull?????????????
                         }
                     }
                 }
@@ -321,6 +319,12 @@ public class Client {
         return inputDV;
     }
 
+     public boolean update_rt(Hashtable<String, Node_data> inputDVEntry){
+       boolean success = false;
+       //i am here????????????????????????????
+       return success;
+     }
+    
     /**
      * the bellman ford algorithm will be here update routing table here
      *

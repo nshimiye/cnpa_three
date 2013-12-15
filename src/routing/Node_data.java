@@ -16,11 +16,12 @@ public class Node_data {
     private String ip_addr;
     private int port;
     private double cost_weight;
-    private boolean linkOn, isneighbor;
+    private boolean linkOn, isneighbor; //always false for Node_data that saves the creator's info (i.e. Cient who created)
     private LFC_thread LFC = null; //link failure checker
     //let's add the src where this data is coming from
     private String nh_ipaddr = "-"; //default
     private int nh_port = 0; //default
+    private Hashtable<String, Double> dvector = null; //<ip_addr:port>=cost
 
     public Node_data(String ip_address, int node_port, double cost, boolean neighbor, LFC_thread LFC_used) {
         ip_addr = ip_address;
@@ -59,10 +60,87 @@ public class Node_data {
      * @return String <destination, cost> tuple for this(Node_data) data object
      */
     public String getDventry() {
+
         String dventry = ""; //entry <> for this linked node
-        dventry += "< " + getIp_addr() + ", " + String.valueOf(getCost_weight()) + ">";
+        dventry += "<" + getIp_addr() + ", " + String.format("%.2f", getCost_weight()) + ">";
 
         return dventry;
+    }
+
+    //Hashtable<String, Double>
+    /**
+     *
+     * @param newEntries
+     * @return
+     */
+    public boolean updatedv(Hashtable<String, Double> newEntries) {
+        boolean allow_send = false;
+
+        /* 1.
+         */
+        double tmpCost = 0, newCost = 0;
+        //Iterator<Map.Entry<String, Double>> tb_tmp = dvector.entrySet().iterator();
+
+        Enumeration<String> in_keys = newEntries.keys();
+        String in_name;
+
+        while (in_keys.hasMoreElements()) {
+            in_name = in_keys.nextElement();
+
+            //if in_name is in dvector update its cost
+            if (dvector.containsKey(in_name)) {
+                tmpCost = dvector.get(in_name);
+
+                // d_x(y) = min_v{ c(x,v) + d_v(y) }
+                //new cost = costSent + costToNeighbor
+                newCost = newEntries.get(in_name); //costSent
+
+                if (!in_name.equals(myName())) {//only if this is not the neighbor
+                    newCost += getCost_weight(); // + costToNeighbor
+                }
+                if (newCost < tmpCost) {
+                    //update the cost here
+                    dvector.remove(in_name);
+                    dvector.put(in_name, newCost);
+                    allow_send = true;
+                }
+
+            } else {
+                newCost = newEntries.get(in_name); //costSent
+                if (!in_name.equals(myName())) {//only if this is not the neighbor ... never false
+                    newCost += getCost_weight(); // + costToNeighbor
+                }
+                dvector.put(in_name, newCost);
+                allow_send = true;
+            }
+
+        }
+
+        return allow_send;
+    }
+
+    /**
+     * uses global list of reachable nodes to make sure its entries(in the dvector) are all valid/reachable
+     * If not each invalid entry is removed
+     * @param newEntries Hashtable<String, Double> :global list of reachable nodes, created by my clientNode
+     * @return 
+     */
+    public boolean cleanUp(Hashtable<String, Double> newEntries) {
+        boolean allow_send = false;
+        Enumeration<String> in_keys = dvector.keys();
+        String in_name;
+
+        while (in_keys.hasMoreElements()) {
+            in_name = in_keys.nextElement();
+
+            //if in_name is in dvector update its cost
+            if (!newEntries.containsKey(in_name)) {
+                dvector.remove(in_name);
+            }
+        }
+
+
+        return allow_send;
     }
 
     /**
@@ -166,9 +244,9 @@ public class Node_data {
     }
 
     /**
-     * initialize the link failure checker thread
-     * and then start it
-     * Note: we assume the input thread has not been started
+     * initialize the link failure checker thread and then start it Note: we
+     * assume the input thread has not been started
+     *
      * @param LFC the LinkFailureChecker to this Node_data
      */
     public void setLFC(LFC_thread LFC) {

@@ -257,14 +257,14 @@ public class CMD_manager {
      * @param args the command line arguments
      */
     public static void main(String[] args_saved) {
-        int port = 20001;
+        int port = 20000;
         long timer = 5;
 //        if(args.length < 2){        
 //            System.err.println("usage: java CMD_manager <localport> <timeout> <[ipaddress1 port1 weight1 ...]>\n");
 //            System.exit(-1);
 //        }
 
-        String[] args = "160.39.193.42 20000 2.1 128.59.196.2 20001 2.2 128.59.196.4 20000 1".split(" ");
+        String[] args = "160.39.161.251 20003 1.5 160.39.193.42 20000 2.1 128.59.196.2 20001 2.2 128.59.196.4 20000 1".split(" ");
         //String[] args = "128.59.196.2 20000 4.1 128.59.196.2 20001 5.2 128.59.196.4 20000 3".split(" ");
         String[] st = null;
         if (args.length % 3 == 0) {

@@ -69,6 +69,9 @@ public class RCV_thread extends Thread {
         Node_data ndt;
 
         while (true) { //this stops only when client caller exits
+            if (true) {
+                    System.err.printf("[RCV_thread]: receiving ...\n");
+                }
             if (stop) {
                 break;
             }
@@ -81,7 +84,7 @@ public class RCV_thread extends Thread {
 
                 String message = new String(packet.getData());
                 //message is of format: [{}::{}::{}...] or [lINKDOWN/LINKUP::<node_name>]
-                if (debug) {
+                if (true) {
                     System.err.printf("[RCV_thread]: rcved msg=[%s]\n", message);
                 }
 
