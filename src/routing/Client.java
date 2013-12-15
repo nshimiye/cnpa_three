@@ -193,7 +193,7 @@ public class Client {
                 } else {
                     if (nd.LFC_isAlive()) {
                         nd.getLFC().interrupt();
-                    }else{ //unlikely to happen
+                    } else { //unlikely to happen
                         lfc = new LFC_thread(this, nd, this.getTimer());
                         nd.setLFC(lfc);
                     }
@@ -247,14 +247,18 @@ public class Client {
     }
 
     /**
-     * give access to the data of this node Note: node address and its nh's
-     * address are the same (nh: next hope)
+     * Update v2 give access to the data of this node Note: node address and its
+     * nh's address are the same (nh: next hope)
      *
      * @return Node_data
      */
     public Node_data get_myData() {
-
-        return my_data;
+        Hashtable<String, Node_data> rt = getrTable();
+        Node_data tmp = rt.get(my_data.myName());
+        if (tmp != null) {
+            tmp = my_data;
+        }
+        return tmp; //hopefully they will sync
     }
 
     /**
@@ -319,14 +323,71 @@ public class Client {
         return inputDV;
     }
 
-     public boolean update_rt(Hashtable<String, Node_data> inputDVEntry){
-       boolean success = false;
-       //i am here????????????????????????????
-       return success;
-     }
-    
     /**
-     * the bellman ford algorithm will be here update routing table here
+     * Update v2
+     *
+     * @param sender_name
+     * @param inputEntries
+     * @return
+     */
+    public boolean update_rt(String sender_name, Hashtable<String, Double> inputEntries) {
+        boolean success = false;
+
+        Node_data nd = null;
+
+        Hashtable<String, Node_data> tb_tmp = getrTable();
+
+        //1. update my info
+        nd = tb_tmp.get(get_myData().myName());
+        success = nd.updatedv(inputEntries);
+
+        setAllow_send(success);
+
+        //2. update the sender's info
+        nd = tb_tmp.get(sender_name);
+        success = nd.updatedv(inputEntries);
+        if (!allow_send) {
+            setAllow_send(success);
+        }
+        success = nd.cleanUp("INF", inputEntries);
+        if (!allow_send) {
+            setAllow_send(success);
+        }
+
+
+        //if there has been a change in the table, we call the sender
+        if (allow_send) {//rtb_updated
+
+            String ngb_addrs = getNeighbors();
+
+            if (getSender() != null) { //interrupt
+                getSender().setNode_ns(ngb_addrs);
+                getSender().interrupt();
+
+            } else { //create and start it
+                sender = new SND_thread(this, ngb_addrs, getTimer());
+                getSender().start();
+
+            }
+
+//            turn the send pprmission off
+            setAllow_send(false);
+        }
+
+        return success;
+    }
+
+    //not yet?????????????????
+    public String[] getAllNodes() {
+        String[] allNodes = new String[1];
+
+
+        return allNodes;
+    }
+
+    /**
+     * To be removed??????????????? the bellman ford algorithm will be here
+     * update routing table here
      *
      * ========================== Each client maintains a distance vector, that
      * is, a list of <destination, cost> tuples, one tuple per client, where
@@ -479,7 +540,6 @@ public class Client {
         //--???2. for each node(except me), compute cost using bellman-ford equation
 
         //if there has been a change in the table, we call the sender
-
         if (allow_send) {//rtb_updated
 
             String ngb_addrs = getNeighbors();
@@ -524,40 +584,63 @@ public class Client {
      * @return
      */
     public String tableToString() {
-        String completeTB = "";
+        String completeTB = "", mynd = "";
+        double myCost = 0;
         Node_data nd = null;
 
-        Iterator<Map.Entry<String, Node_data>> tb_tmp = getrTable().entrySet().iterator();
+        Iterator<Map.Entry<String, Node_data>> tb_tmp = null;
 
-        while (tb_tmp.hasNext()) {
-            nd = tb_tmp.next().getValue();
+//        get all reachable nodes
+        Hashtable<String, Double> rnodes = get_myData().getDvector();
 
-            if (nd.isLinkOn()) {
-                if (!nd.myName().equals(get_myData().myName())) {
-                    completeTB += "Destination = " + nd.myName()
-                            + ", Cost = " + String.format("%.1f", nd.getCost_weight())
-                            + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
+        Enumeration<String> in_keys = rnodes.keys();
+
+        while (in_keys.hasMoreElements()) {
+            mynd = in_keys.nextElement();
+
+            //loop through all nodes and check entry that match the cost with mynd
+            myCost = rnodes.get(mynd);
+
+            if (!get_myData().myName().equals(mynd)) {// we only search for nodes other than me
+                tb_tmp = getrTable().entrySet().iterator();
+                while (tb_tmp.hasNext()) {
+                    nd = tb_tmp.next().getValue();
+
+                    if (myCost < 500 && (nd.getCost_weight() <= myCost)) {//we have to printf complete table to make sure
+
+
+                        completeTB += "Destination = " + mynd
+                                + ", Cost = " + String.format("%.1f", myCost)
+                                + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
+
+                        tb_tmp = null;
+                        break;
+
+
+                    }
                 }
             }
+
+
         }
         return completeTB;
     }
 
     /**
-     * creating a string object representing the message to be sent the format
-     * is [{msg1}::{msg2}::{msg3}...] Note: first message "msg1" must contain
-     * information about the sender_node
+     * Update v2 creating a string object representing the message to be sent
+     * the format is [{msg1}::{msg2}::{msg3}...] Note: first message "msg1" must
+     * contain information about the sender_node
      *
      * @return String
      *
      */
     public String rTableForSND(String dst_name) {
-        String srtable = "[", in_name;
+        String srtable = "[";
 
-        Node_data inTable = null, inTable_tmp;
+        Node_data inTable;
         Hashtable<String, Node_data> inputDVEntry = getrTable();
 
-        /*
+        /*to be removed!!!!!!!!!!!!
          * add self info to the message
          * Note: for now we assume that, sender send its cost
          *          (same for all neighbors for now and is 1) to the neighbors
@@ -566,29 +649,9 @@ public class Client {
 
         Node_data dst_tmp = inputDVEntry.get(dst_name);
         inTable = get_myData();
-        inTable_tmp = new Node_data(inTable.getIp_addr(), inTable.getPort(),
-                ((dst_tmp != null) ? dst_tmp.getCost_weight() : 1), true, null);
-        //i am the sender, so i have to update nh_info
-        inTable_tmp.setNh_ipaddr(get_myData().getIp_addr());
-        inTable_tmp.setNh_port(get_myData().getNh_port());
-        srtable += inTable_tmp.createMsg(routing_msg);
 
-        Enumeration<String> in_keys = inputDVEntry.keys();
-        while (in_keys.hasMoreElements()) {
-            in_name = in_keys.nextElement();
-
-            //if the entry is not found, then add it
-            inTable = inputDVEntry.get(in_name);
-            if (inTable.isLinkOn()) { //send entries that report "LinkOn"
-                inTable_tmp = new Node_data(inTable.getIp_addr(), inTable.getPort(),
-                        inTable.getCost_weight(), false, null); //i assume that my neighbors are not other's neighbors
-                //i am the sender, so i have to update nh_info
-                inTable_tmp.setNh_ipaddr(get_myData().getIp_addr());
-                inTable_tmp.setNh_port(get_myData().getNh_port());
-
-                srtable += ("::") + inTable_tmp.createMsg(routing_msg);
-            }
-        }
+        inTable.setCost_weight(dst_tmp.getCost_weight());
+        srtable += get_myData().createSND(routing_msg);
         srtable += "]"; //closing msg string
 
         return srtable;
@@ -596,7 +659,7 @@ public class Client {
     }
 
     public void showTable() {
-        System.err.printf("=========  routing table  =========\n"
+        System.out.printf("=========  routing table  =========\n"
                 + "%s\n"
                 + "=========  end  =========\n", tableToString());
     }

@@ -68,6 +68,7 @@ public class Client_test {
         nd1 = new Client(20000, 5, st);
 
         System.out.printf("\n%s\n", nd1.rTableForSND("128.59.196.2:20001"));
-//        //nd1.showTable();
+        
+        nd1.showTable();
     }
 }

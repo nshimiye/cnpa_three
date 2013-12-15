@@ -3,8 +3,8 @@ package routing;
 import java.util.*;
 
 /**
- * Marcelin Nshimiyimana an object represetation of data used by the distance
- * vector just data collected and saved in the routing table
+ * an object representation of data used by the distance vector just data
+ * collected and saved in the routing table
  *
  * for a single connected/reachable node
  *
@@ -22,6 +22,7 @@ public class Node_data {
     private String nh_ipaddr = "-"; //default
     private int nh_port = 0; //default
     private Hashtable<String, Double> dvector = null; //<ip_addr:port>=cost
+    private final double INF = 500;
 
     public Node_data(String ip_address, int node_port, double cost, boolean neighbor, LFC_thread LFC_used) {
         ip_addr = ip_address;
@@ -29,6 +30,7 @@ public class Node_data {
         cost_weight = cost;
         isneighbor = neighbor;
         LFC = LFC_used;
+        dvector = new Hashtable<String, Double>();
     }
 
     /**
@@ -88,8 +90,8 @@ public class Node_data {
             in_name = in_keys.nextElement();
 
             //if in_name is in dvector update its cost
-            if (dvector.containsKey(in_name)) {
-                tmpCost = dvector.get(in_name);
+            if (getDvector().containsKey(in_name)) {
+                tmpCost = getDvector().get(in_name);
 
                 // d_x(y) = min_v{ c(x,v) + d_v(y) }
                 //new cost = costSent + costToNeighbor
@@ -100,8 +102,8 @@ public class Node_data {
                 }
                 if (newCost < tmpCost) {
                     //update the cost here
-                    dvector.remove(in_name);
-                    dvector.put(in_name, newCost);
+                    getDvector().remove(in_name);
+                    getDvector().put(in_name, newCost);
                     allow_send = true;
                 }
 
@@ -110,7 +112,7 @@ public class Node_data {
                 if (!in_name.equals(myName())) {//only if this is not the neighbor ... never false
                     newCost += getCost_weight(); // + costToNeighbor
                 }
-                dvector.put(in_name, newCost);
+                getDvector().put(in_name, newCost);
                 allow_send = true;
             }
 
@@ -120,22 +122,32 @@ public class Node_data {
     }
 
     /**
-     * uses global list of reachable nodes to make sure its entries(in the dvector) are all valid/reachable
-     * If not each invalid entry is removed
-     * @param newEntries Hashtable<String, Double> :global list of reachable nodes, created by my clientNode
-     * @return 
+     * uses global list of reachable nodes to make sure its entries(in the
+     * dvector) are all valid/reachable If not each invalid entry is removed
+     *
+     * @param newEntries Hashtable<String, Double> :global list of reachable
+     * nodes, created by my clientNode
+     * @return
      */
-    public boolean cleanUp(Hashtable<String, Double> newEntries) {
+    public boolean cleanUp(String flag, Hashtable<String, Double> newEntries) {
         boolean allow_send = false;
-        Enumeration<String> in_keys = dvector.keys();
+        Enumeration<String> in_keys = getDvector().keys();
         String in_name;
 
         while (in_keys.hasMoreElements()) {
             in_name = in_keys.nextElement();
 
-            //if in_name is in dvector update its cost
+            //if in_name is in dvector clean it up
             if (!newEntries.containsKey(in_name)) {
-                dvector.remove(in_name);
+                if (flag.equals("CLR")) {
+                    getDvector().remove(in_name);
+
+                } else if (flag.equals("INF")) {
+                    getDvector().remove(in_name);
+                    getDvector().put(in_name, INF);
+
+                }
+                allow_send = true;
             }
         }
 
@@ -164,6 +176,36 @@ public class Node_data {
         RoutingMsg += getNh_ipaddr() + " , ";//info about next hop
         RoutingMsg += String.valueOf(getNh_port()) + " , ";//info about next hop
         RoutingMsg += "end }";
+
+        return RoutingMsg;
+    }
+    //{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end}
+
+    public String createSND(String type) {
+
+        /*
+         * add self info to the message
+         * Note: for now we assume that, sender send its cost
+         *          (same for all neighbors for now and is 1) to the neighbors
+         *         and it gets used when the sender is joining the net
+         */
+        String RoutingMsg = createMsg(type);
+
+        Enumeration<String> in_keys = getDvector().keys();
+        String in_name;
+        double cst = 0;
+        String[] ip_port;
+
+        while (in_keys.hasMoreElements()) {
+            in_name = in_keys.nextElement();
+            if (getDvector().containsKey(in_name)) {
+                cst = getDvector().get(in_name);
+                ip_port = in_name.split(":");
+                RoutingMsg += "::{" + type + ", " + ip_port[0] + ", " + ip_port[1] + ", "
+                        + String.format("%.1f", cst) + ", false, " + getNh_ipaddr() + ", "
+                        + String.valueOf(getNh_port()) + ", end}";
+            }
+        }
 
         return RoutingMsg;
     }
@@ -300,5 +342,19 @@ public class Node_data {
      */
     public void setLinkOn(boolean linkOn) {
         this.linkOn = linkOn;
+    }
+
+    /**
+     * @return the dvector
+     */
+    public Hashtable<String, Double> getDvector() {
+        return dvector;
+    }
+
+    /**
+     * @param dvector the dvector to set
+     */
+    public void setDvector(Hashtable<String, Double> dvector) {
+        this.dvector = dvector;
     }
 }
