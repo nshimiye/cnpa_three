@@ -8,14 +8,18 @@
  */
 package routing;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Hashtable;
 import java.util.Scanner;
 
 /**
+ * command manager
  *
- * @author mars command manager
+ * @author mars
  */
-public class CMD_manager extends Thread {
+public class CMD_manager {
 
     /*
      * 1. given a client caller
@@ -51,14 +55,31 @@ public class CMD_manager extends Thread {
      * ROUTE UPDATE message is received again from that neighbor
      */
     private Client meNode = null;
+    private DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+    private Date date;
 
-    public CMD_manager(Client me_node) {
-        meNode = me_node;
+    /**
+     *
+     * @param myPort int : the listening port, on which neighbor send their
+     * routing table info
+     * @param send_timer long: the timeout for resending routing table info to
+     * neighbors
+     * @param node_data String: information about the neighbor of this client
+     * node
+     */
+    public CMD_manager(int myPort, long send_timer, String... node_data) {
+        meNode = new Client(myPort, send_timer, node_data);
 
     }
 
-    @Override
-    public void run() {
+    /**
+     * in charge of processing commands and outputting results
+     */
+    public void cmd_manage() {
+
+        System.out.printf("Node starting on <%s>", meNode.get_myData().myName());
+        System.out.printf("Use these commands to interact with the Node\n"
+                + "[SHOWRT, LINKDOWN, LINKUP, CLOSE], or type \"help\" or \"usage\" to see the commands' usage\n\n[CMD_manager]:");
 
         //create/open input stream
         Scanner inp = new Scanner(System.in);
@@ -67,16 +88,19 @@ public class CMD_manager extends Thread {
         while (true) { //this stops only when client caller exits
 
             //wait for input command
-            cmd_tmp = inp.next();
+            cmd_tmp = inp.nextLine();
+            if(false){System.out.printf("entry = %s\n", cmd_tmp);}
             cmd = cmd_tmp.trim().split(" ");
+            if(false){System.out.printf("command = %s\n", cmd[0]);}
             //processing together with outputting results
             if (cmd.length >= 1) {
-                switch (cmd[0]) {
+                switch (cmd[0].toUpperCase()) {
 
                     //SHOWRT –
                     case "SHOWRT":
-                        System.out.printf("<Current Time>Distance vector list is:\n%s\n", meNode.tableToString());
-
+                        date = new Date();
+                        System.out.printf("<%s> Distance vector list is:\n%s\n",
+                                dateFormat.format(date), meNode.tableToString());
                         break;
 
                     // LINKDOWN {ip_address port} –
@@ -96,6 +120,8 @@ public class CMD_manager extends Thread {
                             if (ndt != null) {
                                 //2. Set this node to offline (:linkon=false)
                                 ndt.setLinkOn(false);
+                                ndt.setIsneighbor(false);
+                                System.out.printf("clearing link to <%s>\n", ndt.myName());
                                 //ndt.setCost_weight(500); //this is infinity
 
                                 /*
@@ -135,8 +161,9 @@ public class CMD_manager extends Thread {
 
                             if (ndt != null) {
                                 //2. Set this node to offline (:linkon=false)
-                                ndt.setLinkOn(false);
-
+                                ndt.setLinkOn(true);
+                                ndt.setIsneighbor(true);
+                                System.out.printf("waiking link to <%s>\n", ndt.myName());
                                 /*
                                  * enable the "alow_send" only
                                  * and not worry about the locking system
@@ -149,14 +176,32 @@ public class CMD_manager extends Thread {
                         }
                         break;
 
+                    case "HELP":
+                    case "USAGE":
+                        System.out.printf(
+                                "• LINKDOWN <ip_address port> – This allows the user to destroy an existing link \n"
+                                + "i.e. change the link cost to infinity to the mentioned neighbor. 	\n"
+                                + " • LINKUP <ip_address port>– This allows the user to restore the link to the \n"
+                                + "mentioned neighbor to the original value after it was destroyed by a LINKDOWN. 	\n"
+                                + " • SHOWRT – This allows the user to view the current routing table of the client. ie. \n"
+                                + "It should indicate for each other client in the network, the cost and neighbor used \n"
+                                + "to reach that client. 	\n"
+                                + " • CLOSE – With this command the client process should close/shutdown.  \n");
+                        break;
+
                     //CLOSE –
                     case "CLOSE":
 
                         //close all open socket 
+                        meNode.getReceiver().setStop(true);
+                        meNode.getReceiver().getSocket().close();
+                        meNode.getSender().setStop(true);
+                        meNode.getSender().getSocket().close();
+
+                        inp.close();
 
                         //then kill the system
                         System.out.printf("[CMD_manager]: Client exiting ...\n");
-                        //i am here?????????????
 
                         System.exit(0);
 
@@ -172,12 +217,41 @@ public class CMD_manager extends Thread {
 
             }
 
-
-            try {
-            } catch (Exception ex) {
-            }
+            System.out.printf("\n[CMD_manager]:");
 
 
         }
+    }
+
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String[] args_saved) {
+        int port = 20005;
+        long timer = 5;
+//        if(args.length < 2){        
+//            System.err.println("usage: java CMD_manager <localport> <timeout> <[ipaddress1 port1 weight1 ...]>\n");
+//            System.exit(-1);
+//        }
+
+        String[] args = "160.39.193.42 20000 2.1 128.59.196.2 20001 2.2 128.59.196.4 20000 1".split(" ");
+        //String[] args = "128.59.196.2 20000 4.1 128.59.196.2 20001 5.2 128.59.196.4 20000 3".split(" ");
+        String[] st = null;
+        if (args.length % 3 == 0) {
+            st = new String[args.length / 3];
+            for (int i = 0; i < st.length; i++) {
+                st[i] = " " + args[i * 3] + " " + args[(i * 3) + 1] + " " + args[(i * 3) + 2] + " ";
+                //System.out.printf("%s\n", st[i]);
+            }
+
+        } else {
+            System.err.println("possible input error");
+            System.exit(-1);
+        }
+        // testing the client's methods
+        // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
+        CMD_manager node_creator = new CMD_manager(port, timer, st);
+
+        node_creator.cmd_manage();
     }
 }

@@ -38,10 +38,21 @@ public class Client {
     private RCV_thread receiver = null;
     private long timer;
     private boolean allow_send = false; //used to make allow sending route updates
-    private final int MAX_UDP = 512;
+    private final int MAX_UDP = 1024;
+    private final double INF = 500;
     private String routing_msg = "ROUTING";
 
-    public Client(int myPort, int send_timer, String... node_data) {
+    /**
+     * This is represents a node in a network
+     *
+     * @param myPort int : the listening port, on which neighbor send their
+     * routing table info
+     * @param send_timer long: the timeout for resending routing table info to
+     * neighbors
+     * @param node_data String: information about the neighbor of this client
+     * node
+     */
+    public Client(int myPort, long send_timer, String... node_data) {
         rTable = new Hashtable<String, Node_data>();
         timer = send_timer * 1000;
 
@@ -150,7 +161,7 @@ public class Client {
      */
     public boolean reInit(String sender_name, String node_msg) {
         boolean status = false;
-        if (true) {// no debug
+        if (debug) {// no debug
             System.out.printf("[reInit]: %s>>>>>> [%s]\n", sender_name, node_msg);
         }
 
@@ -193,7 +204,7 @@ public class Client {
 
                         if (new_tmp == null) {
                             //if not delete(setlink to off and the cost to infinity=500) from the routing table
-                            nd_tmp.setCost_weight(500); //INF = 500
+                            nd_tmp.setCost_weight(INF); //INF = 500
                             nd_tmp.setLinkOn(false);
                             setAllow_send(true);
                         }
@@ -351,7 +362,9 @@ public class Client {
                     input.setNh_port(input_tmp.getNh_port());
                     input.setLinkOn(true);
 
-                    System.out.printf("[updatedv]: %s\n", input.nhName());
+                    if (debug) {
+                        System.out.printf("[updatedv]: %s\n", input.nhName());
+                    }
 
                     current = routingTB.get(curr_name);
                     // d_x(y) = min_v{ c(x,v) + d_v(y) }
@@ -369,7 +382,9 @@ public class Client {
                             }
 
                             //update the cost
-                            input.setCost_weight(newcost);
+                            if (current.isLinkOn()) {
+                                input.setCost_weight(newcost);
+                            }
 
                             //here i have to update the LFC for input
 
@@ -452,19 +467,19 @@ public class Client {
                 }
             }
 
-            if (sender != null) { //interrupt
-                sender.setNode_ns(ngb_addrs);
-                sender.interrupt();
+            if (getSender() != null) { //interrupt
+                getSender().setNode_ns(ngb_addrs);
+                getSender().interrupt();
             } else { //create and start it
                 sender = new SND_thread(this, ngb_addrs, timer);
-                sender.start();
+                getSender().start();
             }
 
 //            turn the send pprmission off
             setAllow_send(false);
         }
         success = true;
-        showTable();//-- to be removed
+        //showTable();//-- to be removed
         //---
         return success;
     }
@@ -482,10 +497,13 @@ public class Client {
 
         while (tb_tmp.hasNext()) {
             nd = tb_tmp.next().getValue();
-            if (!nd.myName().equals(get_myData().myName())) {
-                completeTB += "Destination = " + nd.myName()
-                        + ", Cost = " + String.format("%.1f", nd.getCost_weight())
-                        + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
+
+            if (nd.isLinkOn()) {
+                if (!nd.myName().equals(get_myData().myName())) {
+                    completeTB += "Destination = " + nd.myName()
+                            + ", Cost = " + String.format("%.1f", nd.getCost_weight())
+                            + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
+                }
             }
         }
         return completeTB;
@@ -503,7 +521,6 @@ public class Client {
         String srtable = "[", in_name;
 
         Node_data inTable = null, inTable_tmp;
-
         Hashtable<String, Node_data> inputDVEntry = getrTable();
 
         /*
@@ -520,7 +537,7 @@ public class Client {
         //i am the sender, so i have to update nh_info
         inTable_tmp.setNh_ipaddr(get_myData().getIp_addr());
         inTable_tmp.setNh_port(get_myData().getNh_port());
-        srtable += inTable_tmp.createMsg("ROUTING UPDATE");
+        srtable += inTable_tmp.createMsg(routing_msg);
 
         Enumeration<String> in_keys = inputDVEntry.keys();
         while (in_keys.hasMoreElements()) {
@@ -537,7 +554,6 @@ public class Client {
 
                 srtable += ("::") + inTable_tmp.createMsg(routing_msg);
             }
-
         }
         srtable += "]"; //closing msg string
 
@@ -549,8 +565,6 @@ public class Client {
         System.err.printf("=========  routing table  =========\n"
                 + "%s\n"
                 + "=========  end  =========\n", tableToString());
-
-
     }
 
     /**
@@ -562,9 +576,7 @@ public class Client {
             String[] st = new String[args.length / 3];
             for (int i = 0; i < args.length; i += 3) {
                 st[i] = args[i] + args[i + 1] + args[i + 2];
-
             }
-
         } else {
             System.err.println("possible input error");
             System.exit(-1);
@@ -579,7 +591,8 @@ public class Client {
     }
 
     /**
-     * @param allow_send boolean: the permission for SND_thread to send routing update 
+     * @param allow_send boolean: the permission for SND_thread to send routing
+     * update
      */
     public void setAllow_send(boolean allow_send) {
         this.allow_send = allow_send;
@@ -590,5 +603,19 @@ public class Client {
      */
     public void setRouting_msg(String routing_msg) {
         this.routing_msg = routing_msg;
+    }
+
+    /**
+     * @return the sender
+     */
+    public SND_thread getSender() {
+        return sender;
+    }
+
+    /**
+     * @return the receiver
+     */
+    public RCV_thread getReceiver() {
+        return receiver;
     }
 }

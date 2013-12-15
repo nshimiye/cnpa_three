@@ -32,13 +32,16 @@ public class RCV_thread extends Thread {
     private byte[] buf = null;
     private final int MAX_UDP = 1024;
     private boolean debug = false;
-    DatagramPacket packet = null;
+    private DatagramPacket packet = null;
+    private boolean stop = false;
 
     /**
      * create RCV_thread object
-     * @param me_node Client :the client node that we are going to receive message for,
-     *          it is generally the caller of this thread
-     * @param port int :port to listen to for incoming routing messages(udp packets) 
+     *
+     * @param me_node Client :the client node that we are going to receive
+     * message for, it is generally the caller of this thread
+     * @param port int :port to listen to for incoming routing messages(udp
+     * packets)
      */
     public RCV_thread(Client me_node, int port) {
         meNode = me_node;
@@ -47,6 +50,10 @@ public class RCV_thread extends Thread {
             socket = new DatagramSocket(owner_port);
         } catch (SocketException ex) {
             System.err.printf("\n[RCV_thread]: Error creating udp socket\n");
+            //then kill the system
+            System.err.printf("[CMD_manager]: Client exiting ...\n");
+            System.exit(-1);
+            
         }
 
     }
@@ -55,13 +62,15 @@ public class RCV_thread extends Thread {
     public void run() {
 
         while (true) { //this stops only when client caller exits
-
+            if (stop) {
+                break;
+            }
             try {
 
                 //wiat for upd packet
                 buf = new byte[MAX_UDP];
                 packet = new DatagramPacket(buf, buf.length);
-                socket.receive(packet);
+                getSocket().receive(packet);
 
                 String message = new String(packet.getData());
                 //message is of format: [{}::{}::{}...]
@@ -89,6 +98,21 @@ public class RCV_thread extends Thread {
                 System.err.printf("\n[RCV_thread]: Error receiving this data \n ==%s\n", ex.toString());
             }
         }
+        //getSocket().close();
 
+    }
+
+    /**
+     * @param stop the stop to set
+     */
+    public void setStop(boolean stop) {
+        this.stop = stop;
+    }
+
+    /**
+     * @return the socket
+     */
+    public DatagramSocket getSocket() {
+        return socket;
     }
 }

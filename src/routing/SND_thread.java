@@ -30,11 +30,11 @@ public class SND_thread extends Thread {
     private String message = null;
     private String[] node_ns = null;
     private long timeout = 3000;
-    protected DatagramSocket socket = null;
-    
+    private DatagramSocket socket = null;
+    private boolean stop = false;
     private final int MAX_UDP = 1024;
-
     private boolean debug = false;
+
     /**
      *
      * @param me_node Client :the client/host node, this client should own this
@@ -54,6 +54,10 @@ public class SND_thread extends Thread {
             socket = new DatagramSocket();
         } catch (SocketException ex) {
             System.err.printf("\n[SND_thread]: Error creating udp socket\n");
+            
+             //then kill the system
+            System.err.printf("[CMD_manager]: Client exiting ...\n");
+            System.exit(-1);
         }
 
     }
@@ -62,6 +66,9 @@ public class SND_thread extends Thread {
     public void run() {
 
         while (true) { //this stops only when client caller exits
+            if (stop) {
+                break;
+            }
 
             try {
                 for (int i = 0; i < node_ns.length; i++) {
@@ -69,9 +76,9 @@ public class SND_thread extends Thread {
                     if (debug) {
                         System.err.printf("<%d>-nd_name=[%s]\n", i, ngb_name);
                     }
-                    
+
                     message = selfNode.rTableForSND(ngb_name);
-                    
+
                     String[] ngb_name_tmp = ngb_name.split(":"); //split ip_addr:port
                     String ip_addr = ngb_name_tmp[0]; // ip_addr
                     int port = Integer.valueOf(ngb_name_tmp[1]);// port
@@ -85,11 +92,12 @@ public class SND_thread extends Thread {
                             System.err.printf("[==SND_thread==]:- = [%s]\n", Inet.toString());
                         }
                         packet = new DatagramPacket(message.getBytes(), message.getBytes().length, Inet, port);
-                        socket.send(packet);
-                        
-                       if (true) System.out.printf("[SND_thread-%d]:sending route update to [%s]\n", i,
-                               packet.getAddress().getHostAddress()); //to be fixed?????????
+                        getSocket().send(packet);
 
+                        if (debug) {
+                            System.out.printf("[SND_thread-%d]:sending route update to [%s]\n", i,
+                                    packet.getAddress().getHostAddress()); //to be fixed?????????
+                        }
                         if (debug) {
                             System.err.printf("[SND_thread]:-just send it to = [%s]\n", packet.getAddress().getHostAddress());
                         }
@@ -104,8 +112,14 @@ public class SND_thread extends Thread {
             } catch (InterruptedException ex) {
                 //analyse the cause of interrupt
                 //if from the updatedv method then send again
+
+                if (stop) {
+                    break;
+                }
             }
         }
+        //getSocket().close();
+
     }
 
     /**
@@ -116,5 +130,19 @@ public class SND_thread extends Thread {
 
         this.node_ns = pnode_ns.split(",");
 
+    }
+
+    /**
+     * @param stop the stop to set
+     */
+    public void setStop(boolean stop) {
+        this.stop = stop;
+    }
+
+    /**
+     * @return the socket
+     */
+    public DatagramSocket getSocket() {
+        return socket;
     }
 }
