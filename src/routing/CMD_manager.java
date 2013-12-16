@@ -118,19 +118,22 @@ public class CMD_manager {
                             //here possible race condition with the RCV_thread
                             String head_name = cmd[1].trim() + ":" + cmd[2].trim();
                             //1. Get the routing table from the client
-                            Hashtable<String, Node_data> cmd_rTable = meNode.getrTable();
-                            Node_data ndt = cmd_rTable.get(head_name);
+                            
+                            Node_data ndt = meNode.getrTable().get(head_name);
 
                             if (ndt != null) {
+                                
                                 //2. Set this node to offline (:linkon=false)
-                                ndt.setLinkOn(false);
-                                ndt.setIsneighbor(false);
+                                meNode.getrTable().get(ndt.myName()).setLinkOn(false);
+                                meNode.getrTable().get(ndt.myName()).setIsneighbor(false);
+                                System.out.printf("there!! clearing link to <%s>linkon=%b\n", ndt.myName(), meNode.getrTable().get(ndt.myName()).isLinkOn());
+                                
                                 //ndt.closeLinks();
                                 
-                                if (ndt.LFC_isAlive()) {
-                                    ndt.getLFC().setStop(true);
-                                    ndt.getLFC().interrupt();
-                                    ndt.setLFC(null);
+                                if (meNode.getrTable().get(ndt.myName()).LFC_isAlive()) {
+                                   meNode.getrTable().get(ndt.myName()).getLFC().setStop(true);
+                                    meNode.getrTable().get(ndt.myName()).getLFC().interrupt();
+                                    meNode.getrTable().get(ndt.myName()).setLFC(null);
                                 }
 
                                 //put Linkdown message in queue and interrupt
@@ -144,7 +147,7 @@ public class CMD_manager {
                                 meNode.getSender().setNode_ns(meNode.getNeighbors());
                                 meNode.getSender().interrupt();
 
-                                System.out.printf("clearing link to <%s>\n", ndt.myName());
+                                System.out.printf("clearing link to <%s>linkon=%b\n", ndt.myName(), meNode.getrTable().get(ndt.myName()).isLinkOn());
                                 //ndt.setCost_weight(500); //this is infinity
                                 /*
                                  * 3.tell the client to send LINK DWON update
@@ -266,7 +269,7 @@ public class CMD_manager {
 //            System.exit(-1);
 //        }
 
-        String[] args = "160.39.161.251 20003 1.5 160.39.193.42 20000 2.1 128.59.196.2 20001 2.2 128.59.196.4 20000 1".split(" ");
+        String[] args = "128.59.196.2 20000 1.5 128.59.196.2 20000 2.1 128.59.196.2 20001 2.2 192.168.122.1 2000 1".split(" ");
         //String[] args = "128.59.196.2 20000 4.1 128.59.196.2 20001 5.2 128.59.196.4 20000 3".split(" ");
         String[] st = null;
         if (args.length % 3 == 0) {

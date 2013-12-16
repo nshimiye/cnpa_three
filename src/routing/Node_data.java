@@ -121,8 +121,6 @@ public class Node_data {
     public boolean updatedv(Hashtable<String, String> newEntries) {
         boolean allow_send = false;
 
-        /* 1.
-         */
         double tmpCost = 0, newCost = 0;
         String nhname, nhnamecmp;
         String[] nhname_tmp;
@@ -150,17 +148,30 @@ public class Node_data {
                     newCost = Double.valueOf(nhname_tmp[0].trim());
                     nhname = nhname_tmp[1].trim();
                     nh = meNode.getrTable().get(nhname);
-                    if (debug) { //no debug
-                        System.err.printf("[updatertNode ]: %s>==before?=== [%s]\n", nh.myName(), nh.createSND("OUT"));
-                    }
-                    if (nh != null) {
 
-                        if (debug) {
+                    if (debug) { //no debug
+                        if (nh != null) {
                             System.err.printf("[updatertNode ]: %s>==before?=== [%s]\n", nh.myName(), nh.createSND("OUT"));
                         }
+                    }
+                    // if (nh != null) {
 
-                        if (!in_name.equals(myName())) {//only if this is not the neighbor
-                            newCost += getCost_weight(); // + costToNeighbor
+                    if (debug) {
+                        if (nh != null) {
+                            System.err.printf("[updatertNode ]: %s>==before?=== [%s]\n", nh.myName(), nh.createSND("OUT"));
+                        }
+                    }
+
+                    if (!in_name.equals(myName())) {//only if this is not the neighbor
+                        newCost += ((nh != null && (!nh.myName().equals(in_name))) ? nh.getCost_weight() : 0); // + costToNeighbor
+                    } else {
+                        newCost = 0;
+                        nhname = myName();
+                    }
+
+                    if (newCost < INF) {
+                        if (debug) {
+                            System.err.printf("[updatertNode ]: >==before?=== [new%f <=> old%f]\n", newCost, tmpCost);
                         }
                         if (newCost < tmpCost) {
                             //update the cost here
@@ -169,7 +180,12 @@ public class Node_data {
                             getDvector().put(in_name, nhnamecmp);
                             allow_send = true;
                         }
-
+                    } else {
+                        //update the cost here
+                        nhnamecmp = String.format("%.1f", INF) + "::" + nhname;
+                        getDvector().remove(in_name);
+                        getDvector().put(in_name, nhnamecmp);
+                        //allow_send = true;
                     }
                 }
 
@@ -178,8 +194,9 @@ public class Node_data {
                 newCost = Double.valueOf(nhname_tmp[0].trim()); //costSent
                 nhname = nhname_tmp[1].trim();
 
+                nh = meNode.getrTable().get(nhname);
                 if (!in_name.equals(myName())) {//only if this is not the neighbor ... never false
-                    newCost += getCost_weight(); // + costToNeighbor
+                    newCost += ((nh != null && (!nh.myName().equals(in_name))) ? nh.getCost_weight() : 0); // + costToNeighbor
                 }
                 nhnamecmp = String.format("%.1f", newCost) + "::" + nhname;
                 if (debug) {
@@ -188,6 +205,25 @@ public class Node_data {
                 getDvector().put(in_name, nhnamecmp);
                 allow_send = true;
             }
+
+        }
+
+        return allow_send;
+    }
+
+    public boolean replaceTB(Hashtable<String, String> newEntries) {
+
+        boolean allow_send = false;
+        Enumeration<String> in_keys = newEntries.keys();
+        String in_name;
+
+        getDvector().clear();
+
+        while (in_keys.hasMoreElements()) {
+            in_name = in_keys.nextElement();
+
+            getDvector().put(in_name, newEntries.get(in_name));
+            //allow_send = true;
 
         }
 
@@ -228,9 +264,9 @@ public class Node_data {
                         nhnamecmp = String.format("%.1f", INF) + "::" + nhname;
                         getDvector().remove(in_name);
                         getDvector().put(in_name, nhnamecmp);
-
+                        allow_send = true;
                     }
-                    allow_send = true;
+                    //allow_send = true;
                 }
             }
         }
@@ -382,7 +418,7 @@ public class Node_data {
      * @return the isneighbor
      */
     public boolean isNeighbor() {
-        return isneighbor;
+        return this.isneighbor;
     }
 
     /**
@@ -458,7 +494,7 @@ public class Node_data {
      * @return boolean linkOn: true if connected/reachable, false otherwise
      */
     public boolean isLinkOn() {
-        return linkOn;
+        return this.linkOn;
     }
 
     /**

@@ -166,7 +166,7 @@ public class RCV_thread extends Thread {
                         System.out.printf("[RCV_thread]: reInit failed, no table update made \n");
                     }
 
-                    if (debug) {
+                    if (true) {
                         System.err.printf("[RCV_thread]: rcved msg=[%s]\n", message);
                     }
                 }

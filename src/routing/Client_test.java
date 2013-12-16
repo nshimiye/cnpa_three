@@ -50,7 +50,7 @@ public class Client_test {
 
         System.out.printf("\n\n\t\t\t\t------------test client stage 2-----------\n\n");
 
-        String[] args = "128.59.196.2 20000 4.1 128.59.196.2 20001 5.2 128.59.196.4 20000 3 160.39.160.198 20000 2".split(" ");
+        String[] args = "128.59.196.2 20000 4.1 128.59.196.2 20001 5.2 128.59.196.4 20000 3 160.39.161.238 20000 2".split(" ");
         String[] st = null;
         if (args.length % 3 == 0) {
             st = new String[args.length / 3];
@@ -65,7 +65,7 @@ public class Client_test {
         }
         // testing the client's methods
         // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
-        nd1 = new Client(20001, 5, st);
+        nd1 = new Client(20001, 8, st);
 
         System.out.printf("\n%s\n", nd1.rTableForSND("128.59.196.2:20001"));
         

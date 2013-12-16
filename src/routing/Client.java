@@ -471,7 +471,7 @@ public class Client {
             if (in_name.equals(get_myData().myName())) {
 
                 //1. update my info
-                nd = getrTable().get(get_myData().myName());
+                nd = tb_tmp.get(get_myData().myName());
                 success = nd.updatedv(inputEntries);
 
                 if (debug) { //no debug
@@ -479,25 +479,20 @@ public class Client {
                 }
                 setAllow_send(success);
 
-                //if (sender_name.equals(get_myData().myName())) {//not necessary
-                    success = nd.cleanUp("INF", inputEntries);
-                    if (!allow_send) {
-                        setAllow_send(success);
-                    }
-                //}
+                success = nd.cleanUp("INF", inputEntries);
+                if (!allow_send) {
+                    setAllow_send(success);
+                }
                 if (debug) { //no debug
                     System.out.printf("[updateV2 ]: %s>===after?== [%s]\n", nd.myName(), nd.createSND("OUT"));
                 }
 
             } else if (in_name.equals(sender_name)) {
 
-                //2. update the sender's info
                 nd = tb_tmp.get(sender_name);
-                success = nd.updatedv(inputEntries);
-                if (!allow_send) {
-                    setAllow_send(success);
-                }
-                success = nd.cleanUp("INF", inputEntries);
+
+                success = nd.replaceTB(inputEntries);
+
                 if (!allow_send) {
                     setAllow_send(success);
                 }
@@ -513,7 +508,7 @@ public class Client {
 
         }
 
-success = true;
+        success = true;
         //if there has been a change in the table, we call the sender
         if (allow_send) {//rtb_updated
 
@@ -729,11 +724,16 @@ success = true;
         return success;
     }
 
+    /**
+     *
+     * @return
+     */
     public String getNeighbors() {
 
         Enumeration<String> in_keys = rTable.keys();
         String ngb_addrs = "", in_name;
         Node_data inTable = null;
+
         while (in_keys.hasMoreElements()) {
             in_name = in_keys.nextElement();
             inTable = rTable.get(in_name);
@@ -772,17 +772,19 @@ success = true;
             nhname = nhname_tmp[1].trim();
 
             if (!get_myData().myName().equals(mynd)) {// we only search for nodes other than me
-                
 
                 Node_data nh = getrTable().get(nhname);
+                if (debug) {
+                    System.err.printf("[updatertNode ]: %s>==before?=== [%s]\n", nh.myName(), get_myData().createSND("OUT"));
+                }
                 if (nh != null) {
 
-                    if ((nh.isNeighbor() && nh.isLinkOn())) {//we have to printf complete table to make sure
+                    if ((nh.isNeighbor() && nh.isLinkOn()) && (myCost < INF)) {//we have to printf complete table to make sure
 
                         completeTB += "Destination = " + mynd
                                 + ", Cost = " + String.format("%.1f", myCost)
                                 + ", Link = (" + nh.getNh_ipaddr() + ":" + nh.getNh_port() + ")\n";
-                        
+
                     }
                 }
             }

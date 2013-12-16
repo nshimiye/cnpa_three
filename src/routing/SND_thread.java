@@ -38,6 +38,7 @@ public class SND_thread extends Thread {
     private boolean debug = false;
     private Queue<String[]> msg_queue = new LinkedList<>();
     private boolean single_snd = false;
+    private final double INF = 500;
 
     /**
      *
@@ -99,7 +100,7 @@ public class SND_thread extends Thread {
                             String tobesent = "[" + type.trim() + "::" + selfNode.get_myData().myName().trim() + "]";
                             message = "[" + type.trim() + "::" + selfNode.get_myData().myName().trim() + "]";
                             if (true) {
-                                System.err.printf("\n[SND_thread]: sending to[%s].. [%s]\n", nd_name, message);
+                                System.err.printf("\n[SND_thread]: sending to[%s].. [%s<islinkon>>{%b}>]\n", nd_name, message, selfNode.getrTable().get(nd_name));
                             }
 
                             ngb_name_tmp = nd_name.split(":"); //split ip_addr:port
@@ -130,7 +131,7 @@ public class SND_thread extends Thread {
                             System.err.printf("<%d>-nd_name=[%s]\n", i, ngb_name);
                         }
                         Node_data ntmp = selfNode.getrTable().get(ngb_name);
-                        if (ntmp != null) {//then we know we have valid nodename
+                        if (ntmp != null && ntmp.getCost_weight() < INF) {//then we know we have valid nodename
                             message = selfNode.rTableForSND(ngb_name);
 
                             ngb_name_tmp = ngb_name.split(":"); //split ip_addr:port
