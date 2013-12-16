@@ -36,6 +36,8 @@ public class RCV_thread extends Thread {
     private boolean debug = false;
     private DatagramPacket packet = null;
     private boolean stop = false;
+    
+    private final double INF = 500;
 
     /**
      * create RCV_thread object
@@ -69,9 +71,9 @@ public class RCV_thread extends Thread {
         Node_data ndt;
 
         while (true) { //this stops only when client caller exits
-            if (true) {
-                    System.err.printf("[RCV_thread]: receiving ...\n");
-                }
+            if (debug) {
+                System.err.printf("[RCV_thread]: receiving ...\n");
+            }
             if (stop) {
                 break;
             }
@@ -84,8 +86,8 @@ public class RCV_thread extends Thread {
 
                 String message = new String(packet.getData());
                 //message is of format: [{}::{}::{}...] or [lINKDOWN/LINKUP::<node_name>]
-                if (true) {
-                    System.err.printf("[RCV_thread]: rcved msg=[%s]\n", message);
+                if (debug) {
+                    System.err.printf("[RCV_thread]: rcved msg=%s\n", message);
                 }
 
                 //parse the packet data and create the sender's name
@@ -130,14 +132,15 @@ public class RCV_thread extends Thread {
                     if (ndt != null) {
                         //2. Set this node to offline (:linkon=false)
                         ndt.setLinkOn(false);
-                        //ndt.setIsneighbor(true);
+                        ndt.setIsneighbor(false);
+                        //ndt.setCost_weight(INF);
                         if (ndt.LFC_isAlive()) {
                             ndt.getLFC().setStop(true);
                             ndt.getLFC().interrupt();
                             ndt.setLFC(null);
                         }
 
-                        System.out.printf("waiking link to <%s>\n", ndt.myName());
+                        System.out.printf("clearing link to <%s>\n", ndt.myName());
                         /*
                          * enable the "alow_send" only
                          * and not worry about the locking system
@@ -150,9 +153,14 @@ public class RCV_thread extends Thread {
 
 
                     //String head = message_tmp.split("::")[0]; //{ROUTE UPDATE, ip_addr, port, cost, true, nhAddr, nhPport, end}
+                    head = head.replace('{', ' ');
+                    head = head.replace('}', ' ');
+
                     String[] head_tmp = head.trim().split(",");
                     head_name = head_tmp[1].trim() + ":" + head_tmp[2].trim();
-
+                    if (debug) {
+                        System.err.printf("[RCV_thread]: rcved[%s] msg=[%s]\n", head_name, message);
+                    }
                     boolean status = meNode.reInit(head_name, message);
                     if (!status) {//if reInit exec reports false, then it means no uppdate has been made
                         System.out.printf("[RCV_thread]: reInit failed, no table update made \n");
@@ -163,7 +171,8 @@ public class RCV_thread extends Thread {
                     }
                 }
             } catch (Exception ex) {
-                System.err.printf("\n[RCV_thread]: Error receiving this data \n ==%s\n", ex.toString());
+                ex.printStackTrace();
+                //System.err.printf("\n[RCV_thread]: Error receiving this data \n ==%s\n", ex.toString());
             }
         }
         //getSocket().close();

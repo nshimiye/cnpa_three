@@ -124,7 +124,9 @@ public class CMD_manager {
                             if (ndt != null) {
                                 //2. Set this node to offline (:linkon=false)
                                 ndt.setLinkOn(false);
-                                //ndt.setIsneighbor(false);
+                                ndt.setIsneighbor(false);
+                                //ndt.closeLinks();
+                                
                                 if (ndt.LFC_isAlive()) {
                                     ndt.getLFC().setStop(true);
                                     ndt.getLFC().interrupt();

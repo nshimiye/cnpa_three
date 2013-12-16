@@ -28,6 +28,7 @@ public class LFC_thread extends Thread {
     private Client bNode = null;
     private long timer = 3000;
     private boolean stop = false;
+    private final double INF = 500;
 
     /**
      *
@@ -51,7 +52,7 @@ public class LFC_thread extends Thread {
 
             try {
 
-                Thread.sleep(timer * 9); //wait for awhile and then clear the link
+                Thread.sleep(timer * 5); //wait for awhile and then clear the link
                 //to the bounded client node.
 
                 //here possible race condition with the RCV_thread
@@ -64,19 +65,22 @@ public class LFC_thread extends Thread {
                     //2. Set this node to offline (:linkon=false)
                     ndt.setLinkOn(false);
                     ndt.setIsneighbor(false);
+                    ndt.setCost_weight(INF);
+                    ndt.closeLinks();
+                    System.err.printf("[LFC_thread ]: dying... name= [%s]>%.1f\n", ndt.myName(), bNode.getrTable().get(ndt.myName()).getCost_weight());
+
+//                    //put Linkdown message in queue and interrupt
+//                    Queue<String[]> msg_queue = bNode.getSender().getMsg_queue();
+//                    String[] msg = new String[2];
+//                    msg[0] = "LINKDOWN";
+//                    msg[1] = ndt.myName();
+//                    msg_queue.add(msg);
+//
+//                    bNode.getSender().setSingle_snd(true);
+//                    bNode.getSender().setNode_ns(bNode.getNeighbors());
+//                    bNode.getSender().interrupt();
+
                     ndt.setLFC(null);
-
-                    //put Linkdown message in queue and interrupt
-                    Queue<String[]> msg_queue = bNode.getSender().getMsg_queue();
-                    String[] msg = new String[2];
-                    msg[0] = "LINKDOWN";
-                    msg[1] = ndt.myName();
-                    msg_queue.add(msg);
-
-                    bNode.getSender().setSingle_snd(true);
-                    bNode.getSender().setNode_ns(bNode.getNeighbors());
-                    bNode.getSender().interrupt();
-
                     //System.out.printf("clearing link to <%s>\n", ndt.myName());
                     //ndt.setCost_weight(500); //this is infinity
                     break; //this break allows this LFC_thread to exit

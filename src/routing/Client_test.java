@@ -23,7 +23,7 @@ public class Client_test {
         int node_port = 400,
                 cost = 3;
 
-        Node_data node = new Node_data("127.0.0.1", node_port, cost, true, null);
+        Node_data node = new Node_data("127.0.0.1", node_port, cost, true, null, null);
 
         //for now use ip:port as the id
         String node_name = node.getIp_addr() + ":" + String.valueOf(node.getPort());
@@ -31,7 +31,7 @@ public class Client_test {
 
         System.out.printf("\ntb entry: %s\n", node_name);
 
-        node = new Node_data("127.0.1.2", node_port + 100, cost, true, null);
+        node = new Node_data("127.0.1.2", node_port + 100, cost, true, null, null);
 
         //for now use ip:port as the id
         node_name = node.getIp_addr() + ":" + String.valueOf(node.getPort());
@@ -50,7 +50,7 @@ public class Client_test {
 
         System.out.printf("\n\n\t\t\t\t------------test client stage 2-----------\n\n");
 
-        String[] args = "128.59.196.2 20000 4.1 128.59.196.2 20001 5.2 128.59.196.4 20000 3".split(" ");
+        String[] args = "128.59.196.2 20000 4.1 128.59.196.2 20001 5.2 128.59.196.4 20000 3 160.39.160.198 20000 2".split(" ");
         String[] st = null;
         if (args.length % 3 == 0) {
             st = new String[args.length / 3];
@@ -65,7 +65,7 @@ public class Client_test {
         }
         // testing the client's methods
         // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
-        nd1 = new Client(20000, 5, st);
+        nd1 = new Client(20001, 5, st);
 
         System.out.printf("\n%s\n", nd1.rTableForSND("128.59.196.2:20001"));
         

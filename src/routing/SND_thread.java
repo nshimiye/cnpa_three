@@ -83,8 +83,9 @@ public class SND_thread extends Thread {
             }
 
             try {
-
-                if (single_snd) { //linkdown and linkup
+                message = selfNode.rTableForSND(selfNode.get_myData().myName());
+                String ngb_name_out = "nowhere";
+                if (this.single_snd) { //linkdown and linkup
 
                     while (!msg_queue.isEmpty()) {
                         //format: [0] = LINKDOWN, LINKUP, [ROUTING] 
@@ -96,6 +97,10 @@ public class SND_thread extends Thread {
                             String nd_name = msg_snd[1]; //assume this is always 2
 
                             String tobesent = "[" + type.trim() + "::" + selfNode.get_myData().myName().trim() + "]";
+                            message = "[" + type.trim() + "::" + selfNode.get_myData().myName().trim() + "]";
+                            if (true) {
+                                System.err.printf("\n[SND_thread]: sending to[%s].. [%s]\n", nd_name, message);
+                            }
 
                             ngb_name_tmp = nd_name.split(":"); //split ip_addr:port
                             ip_addr = ngb_name_tmp[0].trim(); // ip_addr
@@ -115,11 +120,12 @@ public class SND_thread extends Thread {
                             }
                         }
                     }
-                    single_snd = false;
+                    this.single_snd = false;
 
                 } else {
                     for (int i = 0; i < node_ns.length; i++) {
                         String ngb_name = node_ns[i]; //ip_addr:port
+                        ngb_name_out = ngb_name;
                         if (debug) {
                             System.err.printf("<%d>-nd_name=[%s]\n", i, ngb_name);
                         }
@@ -151,6 +157,9 @@ public class SND_thread extends Thread {
                                 System.err.printf("\n[SND_thread]: Error sending this data \n ==%s\n", ex.toString());
                             }
                         }
+                    }
+                    if (debug) {
+                        System.err.printf("\n[SND_thread]: sending to[%s].. [%s]\n", ngb_name_out, message);
                     }
                 }
                 Thread.sleep(timeout); //wait for timeout and then send again

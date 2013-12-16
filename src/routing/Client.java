@@ -57,7 +57,6 @@ public class Client {
         rTable = new Hashtable<String, Node_data>();
         timer = send_timer * 1000;
 
-//        I am here?????????????
         String nodes = "",
                 myIpaddr = "";
         try {
@@ -99,35 +98,33 @@ public class Client {
             myIpaddr = "127.0.0.1";
         }
         String nd;
-        for (int i = 0; i < node_data.length - 1; i++) {
+        for (int i = 0; i < node_data.length; i++) {
             nd = node_data[i].trim().replace(' ', ',');
             nodes += "INIT, " + nd + ", true, " + nd + " :: ";
 
         }
 
         //the last entry with no "::"
-        if (node_data.length > 0) {
-            nd = node_data[node_data.length - 1].trim().replace(' ', ',');
-            nodes += "INIT, " + nd + ", true, " + nd;
-        }
+//        if (node_data.length > 0) {
+//            nd = node_data[node_data.length - 1].trim().replace(' ', ',');
+//            nodes += "INIT, " + nd + ", true, " + nd;
+//        }
 
         //create my data 
-        my_data = new Node_data(myIpaddr, myPort, 0, false, null);
+        my_data = new Node_data(myIpaddr, myPort, 0, false, null, this);
         my_data.setNh_ipaddr(myIpaddr);
         my_data.setNh_port(myPort);
         my_data.setLinkOn(false);
         my_data.setLFC(null);
-
+        nd = my_data.getIp_addr() + "," + my_data.getPort() + "," + my_data.getCost_weight();
+        nodes += "INIT, " + nd.trim() + ", false, " + nd.trim();
         //create the sender
         // Thread sender = null; new SND_thread(this, ngb_addrs);
+        //initialize node table with neighbors
+        initialize(nodes);
 
         //create the receiver
         receiver = new RCV_thread(this, myPort);
-
-        //create the command manager
-
-        //initialize node table with neighbors
-        initialize(nodes);
 
         //after init then we can start receiving
         receiver.start();
@@ -141,17 +138,80 @@ public class Client {
      * end}]
      * @return boolean true if init succeeded, false otherwise
      */
-    public boolean initialize(String node_msg) {
+    private boolean initialize(String node_msg) {
         if (debug) {//debug
             System.out.printf("[initialize]: >>>>>> [%s]\n", node_msg);
         }
-        Hashtable<String, Node_data> inputDVector = msg_parser(node_msg);
-
+        Node_data neighbor = null;
         //i have to be in the table first
         rTable.put(my_data.myName(), my_data);
+        Hashtable<String, String> inputDVector = msg_parserV2(node_msg);
 
-        boolean status = update_dv(inputDVector, getrTable());
+        // String nhname, nhnamecmp;
+        String[] nhname_tmp;
 
+        String in_name;
+        String[] names; //names: name split
+        double ncost = 0;
+        Enumeration<String> ngh_keys = inputDVector.keys();
+
+        while (ngh_keys.hasMoreElements()) {
+            in_name = ngh_keys.nextElement();
+            if (!in_name.equals(my_data.myName())) {//do this for neghbors
+
+
+                nhname_tmp = inputDVector.get(in_name).split("::"); //costSent;;
+                ncost = Double.valueOf(nhname_tmp[0].trim());
+                //nhname = nhname_tmp[1].trim();
+                //new
+
+                names = in_name.split(":");
+                String nghIpaddr = names[0]; //possible error
+                int nghPort = Integer.valueOf(names[1]); //possible error
+
+                //add neighbors to rtable here
+                neighbor = new Node_data(nghIpaddr, nghPort, ncost, true, null, this);
+
+                neighbor.setNh_ipaddr(nghIpaddr);
+                neighbor.setNh_port(nghPort);
+                neighbor.setLinkOn(true);
+                neighbor.setIsneighbor(true);
+
+                rTable.put(neighbor.myName(), neighbor);
+
+                if (!neighbor.LFC_isAlive()) {
+                    lfc = new LFC_thread(this, neighbor, this.getTimer());
+                    neighbor.setLFC(lfc);
+                } else {
+                    neighbor.getLFC().interrupt();
+                }
+                if (debug) {
+                    System.out.printf("[init -%d-]: %s>>>>>> [%s]\n", rTable.size(), neighbor.myName(), neighbor.createSND("INIT"));
+                }
+            }
+        }
+
+        if (debug) {
+            System.out.printf("[init -%d-]: %s>outside before [%s]\n\n\n", rTable.size(), my_data.myName(), my_data.createSND("INIT"));
+        }
+        //since we know ourselves only, we can update
+        boolean status = update_rt(my_data.myName(), inputDVector);
+
+        if (debug) {
+            System.out.printf("[init ]\n\n\n");
+
+            System.out.printf("[init ]: %s>==< [%s]\n", get_myData().myName(), get_myData().createSND("INIT"));
+        }
+
+        if (debug) {
+            ngh_keys = rTable.keys();
+            System.out.printf("[init ]\n\n\n");
+            while (ngh_keys.hasMoreElements()) {
+                in_name = ngh_keys.nextElement();
+
+                System.out.printf("[init -%d-]: %s> [%s]\n", rTable.size(), rTable.get(in_name).myName(), rTable.get(in_name).createSND("INIT"));
+            }
+        }
         return status;
     }
 
@@ -168,81 +228,99 @@ public class Client {
             System.out.printf("[reInit]: %s>>>>>> [%s]\n", sender_name, node_msg);
         }
 
-        Hashtable<String, Node_data> inputDVector = msg_parser(node_msg);
+        Hashtable<String, String> inputDVector = msg_parserV2(node_msg);
 
-        //check the existence of the Node_data object that contains data for "sender_name" node
-        Node_data nd = inputDVector.get(sender_name);
+        String[] nhname_tmp;
 
-        if (nd != null) {
-            if (nd.myName().equals(nd.nhName())) {
+        if (debug) {
+            Enumeration<String> ngh_keys = inputDVector.keys();
+            System.out.printf("[init ]\n\n\n");
+            while (ngh_keys.hasMoreElements()) {
+                String in_name = ngh_keys.nextElement();
 
-                //in here, we know that our table can be updated safely
-
-                //save neighbor entry if not already saved first
-                nd.setLinkOn(true);
-                nd.setIsneighbor(true);
-
-                Node_data new_ngb = rTable.get(nd.myName());
-                if (new_ngb == null) { //it is a new node, so we save it
-                    if (!nd.LFC_isAlive()) {
-                        lfc = new LFC_thread(this, nd, this.getTimer());
-                        nd.setLFC(lfc);
-                    }
-                    rTable.put(nd.myName(), nd);
-                    //set sender permission on
-
-                } else {
-                    if (nd.LFC_isAlive()) {
-                        nd.getLFC().interrupt();
-                    } else { //unlikely to happen
-                        lfc = new LFC_thread(this, nd, this.getTimer());
-                        nd.setLFC(lfc);
-                    }
-                }
-
-
-                //---------------------clean up the routing table---------------
-                //useful when link down update is received
-
-                //run through rtable
-                Node_data nd_tmp = null;
-                Iterator<Map.Entry<String, Node_data>> tb_tmp = getrTable().entrySet().iterator();
-
-                while (tb_tmp.hasNext()) {
-                    nd_tmp = tb_tmp.next().getValue();
-                    //if entry reports that its nh is "sender_name" node
-                    if (nd_tmp.nhName().equals(sender_name)) {
-
-                        //then check if it is in the inputDVector
-                        Node_data new_tmp = inputDVector.get(nd_tmp.myName());
-
-                        if (new_tmp == null) {
-                            //if not delete(setlink to off and the cost to infinity=500) from the routing table
-                            nd_tmp.setCost_weight(INF); //INF = 500
-                            nd_tmp.setLinkOn(false);
-                            setAllow_send(true);
-
-                            rTable.remove(new_tmp.myName()); //carefull?????????????
-                        }
-                    }
-                }
-                //--------------------------------------------------------------
-
-                //updater
-                status = update_dv(inputDVector, getrTable());
-
-
-            } else {
-                if (debug) {//no debug
-                    System.out.printf("[reInit inside]: wrong message[%s], no update made \n", node_msg);
-                }
-            }
-
-        } else {
-            if (debug) {// no debug
-                System.out.printf("[reInit outside]: wrong message[%s], no update made \n", node_msg);
+                System.out.printf("[init -%d-]: %s> [%f]\n", inputDVector.size(), in_name, inputDVector.get(in_name));
             }
         }
+
+        Node_data new_ngb = rTable.get(sender_name);
+        double ncost = 1000;
+        if (new_ngb != null) {
+
+
+            nhname_tmp = inputDVector.get(sender_name).split("::"); //costSent;;
+            ncost = Double.valueOf(nhname_tmp[0].trim());
+
+
+            new_ngb.setCost_weight(ncost);
+            new_ngb.setLinkOn(true);
+            new_ngb.setIsneighbor(true);
+            if (new_ngb.LFC_isAlive()) {
+                new_ngb.getLFC().interrupt();
+            } else {
+                lfc = new LFC_thread(this, new_ngb, this.getTimer());
+                new_ngb.setLFC(lfc);
+            }
+
+
+        } else {//it is a new node, so we save it
+
+
+            if (debug) {
+                System.err.printf("[reInit]: rcved[%s] msg=[%s]\n", sender_name, node_msg);
+            }
+
+
+            nhname_tmp = inputDVector.get(sender_name).split("::"); //costSent;;
+            ncost = Double.valueOf(nhname_tmp[0].trim());
+
+
+            String[] names = sender_name.split(":");
+            String nghIpaddr = names[0]; //possible error
+            int nghPort = Integer.valueOf(names[1]); //possible error
+
+            //add neighbors to rtable here
+            Node_data neighbor = new Node_data(nghIpaddr, nghPort, ncost, true, null, this);
+            neighbor.setNh_ipaddr(nghIpaddr);
+            neighbor.setNh_port(nghPort);
+            neighbor.setLinkOn(true);
+            neighbor.setIsneighbor(true);
+
+            rTable.put(neighbor.myName(), neighbor);
+
+            neighbor = rTable.get(neighbor.myName());
+            //set sender permission on
+            if (neighbor.LFC_isAlive()) {//unlikely to happen
+            } else {
+                lfc = new LFC_thread(this, neighbor, this.getTimer());
+                neighbor.setLFC(lfc);
+            }
+        }
+
+        //since we know ourselves only, we can update
+        status = update_rt(sender_name, inputDVector);
+
+
+        if (debug) {
+            Enumeration<String> ngh_keys = rTable.keys();
+            System.out.printf("[init ]\n\n\n");
+            while (ngh_keys.hasMoreElements()) {
+                String in_name = ngh_keys.nextElement();
+
+                System.out.printf("[init -%d-]: %s> [%s]\n", rTable.size(), rTable.get(in_name).myName(), rTable.get(in_name).createSND("INIT"));
+            }
+        }
+
+//            } else {
+//                if (debug) {//no debug
+//                    System.out.printf("[reInit inside]: wrong message[%s], no update made \n", node_msg);
+//                }
+//            }
+//
+//        } else {
+//            if (debug) {// no debug
+//                System.out.printf("[reInit outside]: wrong message[%s], no update made \n", node_msg);
+//            }
+//        }
 
         return status;
     }
@@ -256,10 +334,58 @@ public class Client {
     public Node_data get_myData() {
         Hashtable<String, Node_data> rt = getrTable();
         Node_data tmp = rt.get(my_data.myName());
-        if (tmp != null) {
+        if (tmp == null) {
             tmp = my_data;
         }
         return tmp; //hopefully they will sync
+    }
+
+    public Hashtable<String, String> msg_parserV2(String node_msg) {
+        Hashtable<String, String> inputDV = new Hashtable<>();
+
+        //for now "type" entry is not in use: assume to always be ROUTE UPDATE
+        //[{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, 0, end} :: ...]
+        String node_msg_tmp = node_msg.replace('[', ' ');
+        node_msg_tmp = node_msg_tmp.replace(']', ' ');
+        String[] entries = node_msg_tmp.split("::");
+
+        String nhname, nhnamecmp;
+
+        for (int i = 0; i < entries.length; i++) {
+            //{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end}
+            String entry_tmp = entries[i];
+            if (debug) {// no debug 
+                System.out.printf(">->->->-> [%s]\n", entry_tmp);
+            }
+            entry_tmp = entry_tmp.replace('{', ' ');
+            entry_tmp = entry_tmp.replace('}', ' ');
+
+            String[] entry = entry_tmp.split(",");
+
+            if (entry.length != 8) { //make sure this string array has 9 entries
+                continue;
+            }
+
+            String ipaddr = entry[1].trim();
+            String ports = entry[2].trim();
+            int port = Integer.valueOf(ports);
+            double cost = Double.valueOf(entry[3].trim());
+            String nd_name = ipaddr + ":" + ports;
+
+            //entry[5].trim() nhIp
+            //entry[6].trim() nhPort
+            nhname = entry[5].trim() + ":" + entry[6].trim();
+            nhnamecmp = String.format("%.1f", cost) + "::" + nhname;
+
+            inputDV.put(nd_name, nhnamecmp);
+
+            if (debug) {// no debug 
+                System.out.printf(">->->->-> [%s === %s]\n", entry_tmp, inputDV.get(nd_name));
+            }
+        }
+
+
+        return inputDV;
     }
 
     /**
@@ -278,7 +404,7 @@ public class Client {
         node_msg_tmp = node_msg_tmp.replace(']', ' ');
         String[] entries = node_msg_tmp.split("::");
 
-        
+
         for (int i = 0; i < entries.length; i++) {
             //{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end}
             String entry_tmp = entries[i];
@@ -308,7 +434,7 @@ public class Client {
             LFC_thread lfc = null;
             //=========================
 
-            Node_data new_item = new Node_data(ipaddr, port, cost, isngb, lfc);
+            Node_data new_item = new Node_data(ipaddr, port, cost, isngb, lfc, this);
             new_item.setNh_ipaddr(nh_addr);
             new_item.setNh_port(nh_port);
             new_item.setLinkOn(true); //they by being on
@@ -319,7 +445,6 @@ public class Client {
                 System.out.printf("name=<%s> [ alive=%b] [nghbor=%b] [LFC=%b] [nh=<%s:%d>] [size=%d]\n", input.myName(), input.isLinkOn(),
                         input.isNeighbor(), input.LFC_isAlive(), input.getNh_ipaddr(), input.getNh_port(), inputDV.size());
             }
-
         }
         return inputDV;
     }
@@ -331,31 +456,64 @@ public class Client {
      * @param inputEntries
      * @return
      */
-    public boolean update_rt(String sender_name, Hashtable<String, Double> inputEntries) {
+    public boolean update_rt(String sender_name, Hashtable<String, String> inputEntries) {
         boolean success = false;
-
         Node_data nd = null;
+        String in_name;
 
         Hashtable<String, Node_data> tb_tmp = getrTable();
 
-        //1. update my info
-        nd = tb_tmp.get(get_myData().myName());
-        success = nd.updatedv(inputEntries);
+        Enumeration<String> curr_keys = tb_tmp.keys();
 
-        setAllow_send(success);
+        while (curr_keys.hasMoreElements()) {
+            in_name = curr_keys.nextElement();
 
-        //2. update the sender's info
-        nd = tb_tmp.get(sender_name);
-        success = nd.updatedv(inputEntries);
-        if (!allow_send) {
-            setAllow_send(success);
+            if (in_name.equals(get_myData().myName())) {
+
+                //1. update my info
+                nd = getrTable().get(get_myData().myName());
+                success = nd.updatedv(inputEntries);
+
+                if (debug) { //no debug
+                    System.out.printf("[updateV2 ]: %s>==before?=== [%s]\n", nd.myName(), tb_tmp.get(get_myData().myName()).createSND("OUT"));
+                }
+                setAllow_send(success);
+
+                //if (sender_name.equals(get_myData().myName())) {//not necessary
+                    success = nd.cleanUp("INF", inputEntries);
+                    if (!allow_send) {
+                        setAllow_send(success);
+                    }
+                //}
+                if (debug) { //no debug
+                    System.out.printf("[updateV2 ]: %s>===after?== [%s]\n", nd.myName(), nd.createSND("OUT"));
+                }
+
+            } else if (in_name.equals(sender_name)) {
+
+                //2. update the sender's info
+                nd = tb_tmp.get(sender_name);
+                success = nd.updatedv(inputEntries);
+                if (!allow_send) {
+                    setAllow_send(success);
+                }
+                success = nd.cleanUp("INF", inputEntries);
+                if (!allow_send) {
+                    setAllow_send(success);
+                }
+
+                if (debug) { //no debug
+                    System.out.printf("[updateV2 ]: %s>==????????????=== [%s]\n", get_myData().myName(), tb_tmp.get(get_myData().myName()).createSND("OUT"));
+                }
+
+            } else { //this is for making sure each neighbor has same number of neighbors
+                nd = tb_tmp.get(in_name);
+                nd.addWondersV2(inputEntries);
+            }
+
         }
-        success = nd.cleanUp("INF", inputEntries);
-        if (!allow_send) {
-            setAllow_send(success);
-        }
 
-
+success = true;
         //if there has been a change in the table, we call the sender
         if (allow_send) {//rtb_updated
 
@@ -370,9 +528,17 @@ public class Client {
                 getSender().start();
 
             }
+            if (debug) { //debug
+                System.out.printf("[updateV2 ]: %s>==allowsend [%s]\n", get_myData().myName(), tb_tmp.get(get_myData().myName()).createSND("OUT"));
+            }
 
 //            turn the send pprmission off
             setAllow_send(false);
+            success = true;
+        }
+
+        if (debug) { //no debug
+            System.out.printf("[updateV2 ]: %s>==lastbut One=== [%s]\n", get_myData().myName(), tb_tmp.get(get_myData().myName()).createSND("OUT"));
         }
 
         return success;
@@ -439,7 +605,7 @@ public class Client {
                 if (in_name.equals(curr_name)) {
                     input_tmp = inputDVEntry.get(in_name);
                     input = new Node_data(input_tmp.getIp_addr(), input_tmp.getPort(),
-                            input_tmp.getCost_weight(), input_tmp.isNeighbor(), input_tmp.getLFC());
+                            input_tmp.getCost_weight(), input_tmp.isNeighbor(), input_tmp.getLFC(), this);
 
                     input.setNh_ipaddr(input_tmp.getNh_ipaddr());
                     input.setNh_port(input_tmp.getNh_port());
@@ -500,7 +666,7 @@ public class Client {
 
                     input_tmp = inputDVEntry.get(in_name);
                     input = new Node_data(input_tmp.getIp_addr(), input_tmp.getPort(),
-                            input_tmp.getCost_weight(), input_tmp.isNeighbor(), input_tmp.getLFC());
+                            input_tmp.getCost_weight(), input_tmp.isNeighbor(), input_tmp.getLFC(), this);
 
                     input.setNh_ipaddr(input_tmp.getNh_ipaddr());
                     input.setNh_port(input_tmp.getNh_port());
@@ -571,7 +737,7 @@ public class Client {
         while (in_keys.hasMoreElements()) {
             in_name = in_keys.nextElement();
             inTable = rTable.get(in_name);
-            if (inTable.isNeighbor() && inTable.isLinkOn()) {
+            if (inTable.isNeighbor() && inTable.isLinkOn() && (!inTable.myName().equals(get_myData().myName()))) {
                 ngb_addrs += ((ngb_addrs.trim().equals("")) ? "" : ",") + inTable.myName();
             }
         }
@@ -587,12 +753,12 @@ public class Client {
     public String tableToString() {
         String completeTB = "", mynd = "";
         double myCost = 0;
-        Node_data nd = null;
 
-        Iterator<Map.Entry<String, Node_data>> tb_tmp = null;
+        String nhname;
+        String[] nhname_tmp;
 
 //        get all reachable nodes
-        Hashtable<String, Double> rnodes = get_myData().getDvector();
+        Hashtable<String, String> rnodes = get_myData().getDvector();
 
         Enumeration<String> in_keys = rnodes.keys();
 
@@ -600,24 +766,23 @@ public class Client {
             mynd = in_keys.nextElement();
 
             //loop through all nodes and check entry that match the cost with mynd
-            myCost = rnodes.get(mynd);
+
+            nhname_tmp = rnodes.get(mynd).split("::"); //costSent;;
+            myCost = Double.valueOf(nhname_tmp[0].trim());
+            nhname = nhname_tmp[1].trim();
 
             if (!get_myData().myName().equals(mynd)) {// we only search for nodes other than me
-                tb_tmp = getrTable().entrySet().iterator();
-                while (tb_tmp.hasNext()) {
-                    nd = tb_tmp.next().getValue();
+                
 
-                    if (myCost < 500 && (nd.getCost_weight() <= myCost)) {//we have to printf complete table to make sure
+                Node_data nh = getrTable().get(nhname);
+                if (nh != null) {
 
+                    if ((nh.isNeighbor() && nh.isLinkOn())) {//we have to printf complete table to make sure
 
                         completeTB += "Destination = " + mynd
                                 + ", Cost = " + String.format("%.1f", myCost)
-                                + ", Link = (" + nd.getNh_ipaddr() + ":" + nd.getNh_port() + ")\n";
-
-                        tb_tmp = null;
-                        break;
-
-
+                                + ", Link = (" + nh.getNh_ipaddr() + ":" + nh.getNh_port() + ")\n";
+                        
                     }
                 }
             }
