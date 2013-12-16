@@ -57,6 +57,7 @@ public class Client {
         rTable = new Hashtable<String, Node_data>();
         timer = send_timer * 1000;
 
+//        I am here?????????????
         String nodes = "",
                 myIpaddr = "";
         try {
@@ -277,7 +278,7 @@ public class Client {
         node_msg_tmp = node_msg_tmp.replace(']', ' ');
         String[] entries = node_msg_tmp.split("::");
 
-        //i am here???????
+        
         for (int i = 0; i < entries.length; i++) {
             //{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end}
             String entry_tmp = entries[i];
@@ -620,7 +621,6 @@ public class Client {
                     }
                 }
             }
-
 
         }
         return completeTB;
