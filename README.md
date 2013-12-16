@@ -1,7 +1,7 @@
 cnpa_three
 ==========
 
-Computer networks PA3, to be done by 12/10/2013
+Computer networks PA3, to be done by 12/15/2013
 
 Marcellin Nshimiyimana
 Programming Assignement 3
@@ -20,4 +20,13 @@ Use of LINKDOWN command on one or more clients to show its correct effect 15
 Use of LINKUP command on one or more terminals to show its correct effect 15
   -
 Use of CLOSE command and show its correct effect 15
-  -
+  - works!
+  - 
+  
+To run the clients.
+
+compile with make and then 
+
+
+
+
