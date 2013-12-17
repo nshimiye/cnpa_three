@@ -14,13 +14,13 @@ Features:
 
 Stable distributed routing table with a network of size 5 with few of the clients on same machine. 
   -
-Use of SHOWRT. 30
+Use of SHOWRT.
   - works!
-Use of LINKDOWN command on one or more clients to show its correct effect 15
+Use of LINKDOWN command on one or more clients to show its correct effect
   - works
-Use of LINKUP command on one or more terminals to show its correct effect 15
+Use of LINKUP command on one or more terminals to show its correct effect
   - works
-Use of CLOSE command and show its correct effect 15
+Use of CLOSE command and show its correct effect
   - works!
   
 To run the clients.
