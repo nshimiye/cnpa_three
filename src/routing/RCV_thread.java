@@ -36,7 +36,6 @@ public class RCV_thread extends Thread {
     private boolean debug = false;
     private DatagramPacket packet = null;
     private boolean stop = false;
-    
     private final double INF = 500;
 
     /**
@@ -84,7 +83,7 @@ public class RCV_thread extends Thread {
                 packet = new DatagramPacket(buf, buf.length);
                 getSocket().receive(packet);
 
-                String message = new String(packet.getData());
+                String message = new String(packet.getData(), 0, packet.getLength());
                 //message is of format: [{}::{}::{}...] or [lINKDOWN/LINKUP::<node_name>]
                 if (debug) {
                     System.err.printf("[RCV_thread]: rcved msg=%s\n", message);
@@ -97,23 +96,30 @@ public class RCV_thread extends Thread {
 
                 String[] attempt_link = message_tmp.split("::"); //meaning assume we have LINKUP/DOWN
 
-                String head = attempt_link[0]; //{ROUTING, ip_addr, port, cost, true, nhAddr, nhPport, end}
+                String head = attempt_link[0].trim(); //{ROUTING, ip_addr, port, cost, true, nhAddr, nhPport, end}
 
 
                 if (head.trim().equals("LINKUP")) {
-                    head_name = attempt_link[1];
+                    head_name = attempt_link[1].trim();
                     //1. Get the routing table from the client
                     cmd_rTable = meNode.getrTable();
                     ndt = cmd_rTable.get(head_name);
 
+                    if (debug) {
+                        System.err.printf("[RCV_thread]: rcved msg=%s\n", message);
+                    }
+
                     if (ndt != null) {
                         //2. Set this node to offline (:linkon=false)
-                        ndt.setLinkOn(true);
-                        ndt.setIsneighbor(true);
-                        LFC_thread lfc = new LFC_thread(meNode, ndt, meNode.getTimer());
-                        ndt.setLFC(lfc);
-
-                        System.out.printf("waiking link to <%s>\n", ndt.myName());
+                        meNode.getrTable().get(ndt.myName()).setLinkOn(true);
+                        meNode.getrTable().get(ndt.myName()).setIsneighbor(true);
+                        if (meNode.getrTable().get(ndt.myName()).LFC_isAlive()) {
+                            meNode.getrTable().get(ndt.myName()).getLFC().interrupt();
+                        } else {
+                            LFC_thread lfc = new LFC_thread(meNode, ndt, meNode.getTimer());
+                            meNode.getrTable().get(ndt.myName()).setLFC(lfc);
+                        }
+                         if (debug) System.out.printf("waiking link to <%s>\n", ndt.myName());
                         /*
                          * enable the "alow_send" only
                          * and not worry about the locking system
@@ -124,23 +130,32 @@ public class RCV_thread extends Thread {
                 } else if (head.trim().equals("LINKDOWN")) {
                     //we just clear or enable the link
                     //here possible race condition with the RCV_thread
-                    head_name = attempt_link[1];
+                    head_name = attempt_link[1].trim();
                     //1. Get the routing table from the client
                     cmd_rTable = meNode.getrTable();
                     ndt = cmd_rTable.get(head_name);
 
+                    if (debug) {
+                        System.err.printf("[RCV_thread]:hereeee rcved msg=%s..len=%d\n", message, packet.getLength());
+
+                        System.err.printf("about clearing link to <%s>\n", head_name);
+                    }
                     if (ndt != null) {
                         //2. Set this node to offline (:linkon=false)
-                        ndt.setLinkOn(false);
-                        ndt.setIsneighbor(false);
-                        //ndt.setCost_weight(INF);
-                        if (ndt.LFC_isAlive()) {
-                            ndt.getLFC().setStop(true);
-                            ndt.getLFC().interrupt();
-                            ndt.setLFC(null);
+                        meNode.getrTable().get(ndt.myName()).setLinkOn(false);
+                        meNode.getrTable().get(ndt.myName()).setIsneighbor(false);
+                        //meNode.getrTable().get(ndt.myName()).setCost_weight(500);
+                        meNode.getrTable().get(ndt.myName()).closeLinks();
+                        if (meNode.getrTable().get(ndt.myName()).LFC_isAlive()) {
+
+                            meNode.getrTable().get(ndt.myName()).getLFC().setStop(true);
+                            meNode.getrTable().get(ndt.myName()).getLFC().interrupt();
+                            meNode.getrTable().get(ndt.myName()).setLFC(null);
                         }
 
-                        System.out.printf("clearing link to <%s>\n", ndt.myName());
+                        if (debug) {
+                            System.err.printf("clearing link to <%s>\n", ndt.myName());
+                        }
                         /*
                          * enable the "alow_send" only
                          * and not worry about the locking system
@@ -161,18 +176,29 @@ public class RCV_thread extends Thread {
                     if (debug) {
                         System.err.printf("[RCV_thread]: rcved[%s] msg=[%s]\n", head_name, message);
                     }
-                    boolean status = meNode.reInit(head_name, message);
-                    if (!status) {//if reInit exec reports false, then it means no uppdate has been made
-                        System.out.printf("[RCV_thread]: reInit failed, no table update made \n");
-                    }
 
-                    if (true) {
-                        System.err.printf("[RCV_thread]: rcved msg=[%s]\n", message);
+                    if (meNode.getrTable().get(head_name).isLinkOn()) {
+
+                        boolean status = meNode.reInit(head_name, message);
+                        if (!status) {//if reInit exec reports false, then it means no uppdate has been made
+                            System.out.printf("[RCV_thread]: reInit failed, no table update made \n");
+                        }
+
+                        if (debug) {
+                            System.err.printf("[RCV_thread]: rcved msg=[%s]\n", message);
+                        }
+
                     }
                 }
             } catch (Exception ex) {
-                ex.printStackTrace();
-                //System.err.printf("\n[RCV_thread]: Error receiving this data \n ==%s\n", ex.toString());
+
+                if (debug) {
+                    System.err.printf("\n[RCV_thread]: Error receiving this data \n[%s]\n", ex.getMessage());
+                }
+
+                if (debug) {
+                    ex.printStackTrace();
+                }
             }
         }
         //getSocket().close();

@@ -1,5 +1,5 @@
 /*
- * CMD_manager.java
+ * BFclient.java
  *
  * Created on __Dec 12, 2013__, __11:46:09 PM__
  *
@@ -20,7 +20,7 @@ import java.util.Scanner;
  *
  * @author mars
  */
-public class CMD_manager {
+public class CMD_manager_Z {
 
     /*
      * 1. given a client caller
@@ -58,6 +58,7 @@ public class CMD_manager {
     private Client meNode = null;
     private DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
     private Date date;
+    private boolean debug = false;
 
     /**
      *
@@ -68,7 +69,7 @@ public class CMD_manager {
      * @param node_data String: information about the neighbor of this client
      * node
      */
-    public CMD_manager(int myPort, long send_timer, String... node_data) {
+    public CMD_manager_Z(int myPort, long send_timer, String... node_data) {
         meNode = new Client(myPort, send_timer, node_data);
 
     }
@@ -90,7 +91,7 @@ public class CMD_manager {
 
             //wait for input command
             cmd_tmp = inp.nextLine();
-            if (false) {
+            if (debug) {
                 System.out.printf("entry = %s\n", cmd_tmp);
             }
             cmd = cmd_tmp.trim().split(" ");
@@ -118,20 +119,20 @@ public class CMD_manager {
                             //here possible race condition with the RCV_thread
                             String head_name = cmd[1].trim() + ":" + cmd[2].trim();
                             //1. Get the routing table from the client
-                            
+
                             Node_data ndt = meNode.getrTable().get(head_name);
 
                             if (ndt != null) {
-                                
+
                                 //2. Set this node to offline (:linkon=false)
                                 meNode.getrTable().get(ndt.myName()).setLinkOn(false);
                                 meNode.getrTable().get(ndt.myName()).setIsneighbor(false);
                                 System.out.printf("there!! clearing link to <%s>linkon=%b\n", ndt.myName(), meNode.getrTable().get(ndt.myName()).isLinkOn());
-                                
+
                                 //ndt.closeLinks();
-                                
+
                                 if (meNode.getrTable().get(ndt.myName()).LFC_isAlive()) {
-                                   meNode.getrTable().get(ndt.myName()).getLFC().setStop(true);
+                                    meNode.getrTable().get(ndt.myName()).getLFC().setStop(true);
                                     meNode.getrTable().get(ndt.myName()).getLFC().interrupt();
                                     meNode.getrTable().get(ndt.myName()).setLFC(null);
                                 }
@@ -153,7 +154,7 @@ public class CMD_manager {
                                  * 3.tell the client to send LINK DWON update
                                  * this is not necessary if RCV_thread is processing
                                  * msg from other nodes, so
-                                 * we can add a sensing system that will tell CMD_manager
+                                 * we can add a sensing system that will tell BFclient
                                  * to just enable "alow_send" of the client if RCV_thread
                                  * is processing. (: help avoiding race condition)
                                  * 
@@ -262,14 +263,14 @@ public class CMD_manager {
      * @param args the command line arguments
      */
     public static void main(String[] args_saved) {
-        int port = 20000;
+        int port = 20003;
         long timer = 5;
 //        if(args.length < 2){        
-//            System.err.println("usage: java CMD_manager <localport> <timeout> <[ipaddress1 port1 weight1 ...]>\n");
+//            System.err.println("usage: java BFclient <localport> <timeout> <[ipaddress1 port1 weight1 ...]>\n");
 //            System.exit(-1);
 //        }
 
-        String[] args = "128.59.196.2 20000 1.5 128.59.196.2 20000 2.1 128.59.196.2 20001 2.2 192.168.122.1 2000 1".split(" ");
+        String[] args = "160.39.193.188 20001 7 160.39.193.188 20002 1".split(" ");
         //String[] args = "128.59.196.2 20000 4.1 128.59.196.2 20001 5.2 128.59.196.4 20000 3".split(" ");
         String[] st = null;
         if (args.length % 3 == 0) {
@@ -285,7 +286,7 @@ public class CMD_manager {
         }
         // testing the client's methods
         // 128.59.196.2 20000 4.1 128.59.196.2 20001 5.2
-        CMD_manager node_creator = new CMD_manager(port, timer, st);
+        BFclient node_creator = new BFclient(port, timer, st);
 
         node_creator.cmd_manage();
     }

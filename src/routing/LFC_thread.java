@@ -5,7 +5,6 @@
 package routing;
 
 import java.util.Hashtable;
-import java.util.Queue;
 
 /**
  *
@@ -46,13 +45,12 @@ public class LFC_thread extends Thread {
     public void run() {
 
         while (true) { //this stops only when client caller exits
-            if (stop) {
+            if (this.stop) {
                 break;
             }
 
             try {
-
-                Thread.sleep(timer * 5); //wait for awhile and then clear the link
+                Thread.sleep(timer * 3); //wait for awhile and then clear the link
                 //to the bounded client node.
 
                 //here possible race condition with the RCV_thread
@@ -63,12 +61,19 @@ public class LFC_thread extends Thread {
 
                 if (ndt != null) {
                     //2. Set this node to offline (:linkon=false)
-                    ndt.setLinkOn(false);
-                    ndt.setIsneighbor(false);
-                    ndt.setCost_weight(INF);
-                    ndt.closeLinks();
-                    System.err.printf("[LFC_thread ]: dying... name= [%s]>%.1f\n", ndt.myName(), bNode.getrTable().get(ndt.myName()).getCost_weight());
+                    //bNode.getrTable().get(ndt.myName()).setLinkOn(false);
+                    bNode.getrTable().get(ndt.myName()).setIsneighbor(false);
+                    bNode.getrTable().get(ndt.myName()).setCost_weight(INF);
+                    bNode.getrTable().get(ndt.myName()).closeLinks();
+                    String nhn = bNode.getrTable().get(ndt.myName()).nhName();
 
+                    bNode.getrTable().get(nhn).getDvector().remove(ndt.myName());
+
+//                     System.err.printf("[LFC_thread ]: dying... name= [%s]>%.1f linkon=[%b]\n", ndt.myName(),
+//                            bNode.getrTable().get(ndt.myName()).getCost_weight(), bNode.getrTable().get(ndt.myName()).isLinkOn());
+                    //bNode.getrTable().remove(ndt.myName());
+                    // ndt.setLFC(null);
+                    // ndt = null;
 //                    //put Linkdown message in queue and interrupt
 //                    Queue<String[]> msg_queue = bNode.getSender().getMsg_queue();
 //                    String[] msg = new String[2];
@@ -77,10 +82,10 @@ public class LFC_thread extends Thread {
 //                    msg_queue.add(msg);
 //
 //                    bNode.getSender().setSingle_snd(true);
-//                    bNode.getSender().setNode_ns(bNode.getNeighbors());
-//                    bNode.getSender().interrupt();
+                    //bNode.getSender().setNode_ns(bNode.getNeighbors());
+                    //bNode.getSender().interrupt();
 
-                    ndt.setLFC(null);
+
                     //System.out.printf("clearing link to <%s>\n", ndt.myName());
                     //ndt.setCost_weight(500); //this is infinity
                     break; //this break allows this LFC_thread to exit
@@ -91,7 +96,7 @@ public class LFC_thread extends Thread {
                 //analyse the cause of interrupt
                 //if from the updatedv method then send again
 
-                if (stop) {
+                if (this.stop) {
                     break;
                 }
             }

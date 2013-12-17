@@ -33,7 +33,7 @@ public class Node_data {
         isneighbor = neighbor;
         LFC = LFC_used;
         meNode = me_node;
-        dvector = new Hashtable<>();
+        dvector = new Hashtable<String, String>();
 
     }
 
@@ -124,7 +124,7 @@ public class Node_data {
         double tmpCost = 0, newCost = 0;
         String nhname, nhnamecmp;
         String[] nhname_tmp;
-        Node_data nh = null;
+        Node_data nh = null, curr_nh = null;
         //Iterator<Map.Entry<String, Double>> tb_tmp = dvector.entrySet().iterator();
 
         Enumeration<String> in_keys = newEntries.keys();
@@ -141,6 +141,8 @@ public class Node_data {
                 if (tmpp != null) {
                     nhname_tmp = tmpp.split("::");
                     tmpCost = Double.valueOf(nhname_tmp[0].trim());
+                    nhname = nhname_tmp[1].trim();
+                    curr_nh = meNode.getrTable().get(nhname);
 
                     // d_x(y) = min_v{ c(x,v) + d_v(y) }
                     //new cost = costSent + costToNeighbor
@@ -173,7 +175,7 @@ public class Node_data {
                         if (debug) {
                             System.err.printf("[updatertNode ]: >==before?=== [new%f <=> old%f]\n", newCost, tmpCost);
                         }
-                        if (newCost < tmpCost) {
+                        if ((newCost < tmpCost) || (!curr_nh.isLinkOn()) || (curr_nh.getCost_weight() >= INF)) {
                             //update the cost here
                             nhnamecmp = String.format("%.1f", newCost) + "::" + nhname;
                             getDvector().remove(in_name);
@@ -267,6 +269,19 @@ public class Node_data {
                         allow_send = true;
                     }
                     //allow_send = true;
+                }
+            } else {
+                String tmpp = newEntries.get(in_name);
+                nhname_tmp = tmpp.split("::");
+
+                nhname = nhname_tmp[1].trim();
+
+                if (nhname.equals(myName())) {
+                    //you do the same as up
+                    nhnamecmp = String.format("%.1f", INF) + "::" + nhname;
+                    getDvector().remove(in_name);
+                    getDvector().put(in_name, nhnamecmp);
+                    allow_send = true;
                 }
             }
         }

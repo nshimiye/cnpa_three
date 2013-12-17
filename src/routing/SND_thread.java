@@ -57,6 +57,8 @@ public class SND_thread extends Thread {
         timeout = time_out;
         try {
             socket = new DatagramSocket();
+            socket = new DatagramSocket();
+
         } catch (SocketException ex) {
             System.err.printf("\n[SND_thread]: Error creating udp socket\n");
 
@@ -93,14 +95,16 @@ public class SND_thread extends Thread {
                         //        [1] = node_name or [all]
                         String[] msg_snd = getMsg_queue().poll();
                         if (msg_snd != null) {
-                            System.out.printf("[SND_thread]:= [%d]\n", msg_snd.length);
+                            if (debug) {
+                                System.out.printf("[SND_thread]:= [%d]\n", msg_snd.length);
+                            }
                             String type = msg_snd[0];
                             String nd_name = msg_snd[1]; //assume this is always 2
 
                             String tobesent = "[" + type.trim() + "::" + selfNode.get_myData().myName().trim() + "]";
                             message = "[" + type.trim() + "::" + selfNode.get_myData().myName().trim() + "]";
-                            if (true) {
-                                System.err.printf("\n[SND_thread]: sending to[%s].. [%s<islinkon>>{%b}>]\n", nd_name, message, selfNode.getrTable().get(nd_name));
+                            if (debug) {
+                                System.err.printf("\n[SND_thread]: sending to[%s].. [%s<islinkon>>{%b}>]\n", nd_name, message, selfNode.getrTable().get(nd_name).isLinkOn());
                             }
 
                             ngb_name_tmp = nd_name.split(":"); //split ip_addr:port
@@ -117,7 +121,9 @@ public class SND_thread extends Thread {
 
 
                             } catch (Exception ex) {
-                                System.err.printf("\n[SND_thread]: Error sending this data \n ==%s\n", ex.toString());
+                                if (debug) {
+                                    System.err.printf("\n[SND_thread]: Error sending this data \n ==%s\n", ex.toString());
+                                }
                             }
                         }
                     }

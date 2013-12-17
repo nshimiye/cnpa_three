@@ -7,8 +7,6 @@ import java.net.Inet4Address;
 import java.net.NetworkInterface;
 import java.util.Enumeration;
 import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.Map;
 
 /**
  *
@@ -341,7 +339,7 @@ public class Client {
     }
 
     public Hashtable<String, String> msg_parserV2(String node_msg) {
-        Hashtable<String, String> inputDV = new Hashtable<>();
+        Hashtable<String, String> inputDV = new Hashtable<String, String>();
 
         //for now "type" entry is not in use: assume to always be ROUTE UPDATE
         //[{ type, ip_addr, port, cost, isNeighbor, nh_addr, nh_port, end} :: { -, ip_addr, port, cost, -, -, 0, end} :: ...]
@@ -737,7 +735,7 @@ public class Client {
         while (in_keys.hasMoreElements()) {
             in_name = in_keys.nextElement();
             inTable = rTable.get(in_name);
-            if (inTable.isNeighbor() && inTable.isLinkOn() && (!inTable.myName().equals(get_myData().myName()))) {
+            if (rTable.get(in_name).isNeighbor() && rTable.get(in_name).isLinkOn() && (!rTable.get(in_name).myName().equals(get_myData().myName()))) {
                 ngb_addrs += ((ngb_addrs.trim().equals("")) ? "" : ",") + inTable.myName();
             }
         }
@@ -775,7 +773,9 @@ public class Client {
 
                 Node_data nh = getrTable().get(nhname);
                 if (debug) {
-                    System.err.printf("[updatertNode ]: %s>==before?=== [%s]\n", nh.myName(), get_myData().createSND("OUT"));
+                    if (nh != null) {
+                        System.err.printf("[updatertNode ]: %s:%b>==before?=== [%s]\n", nh.myName(), nh.isLinkOn(), get_myData().createSND("OUT"));
+                    }
                 }
                 if (nh != null) {
 
